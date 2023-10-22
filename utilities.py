@@ -4,6 +4,18 @@ import numpy as np
 def get_moves(board_array: np.array,
               index: tuple,
               ) -> np.array:
+    """
+    Return a binary array of legal moves.
+
+    The index of the array encodes a move relative to the passed in index.
+    The value of the array indicates whether that move is legal (1) or not (0).
+    Indices 0-9 encode "move up 1-10 spaces", indices 10-19 encode "move down 1-10 spaces",
+    Indices 20-29 encode "move left 1-10 spaces", indices 30-39 encode "move right 1-10 spaces".
+
+    :param np.array board_array: a 2D NumPy array representing the board
+    :param tuple index: a tuple(int, int) representing the index of the piece whose legal moves we're checking.
+    :return: A 1D binary NumPy array of length 40 representing legal moves
+    """
     size = board_array.shape[-1]
     legal_moves = np.zeros(40)
     dirty_indices = []
@@ -37,7 +49,7 @@ def make_move(board_array: np.array,
               index: tuple,
               move: int,
               ) -> None:
-    "Move the piece at index according to move. Assumes the move is legal."
+    """Move the piece at index according to move. Assumes the move is legal."""
     # Find which plane the piece is on (which piece type it is)
     plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
     # Get the move axis, direction, and number of tiles
@@ -51,22 +63,29 @@ def make_move(board_array: np.array,
     board_array[plane, index[0], index[1]] = 0
 
 
-def check_capture(board_array: np.array,
-                  index: tuple,
-                  ) -> None:
-    "Given an index, checks to see if any basic enemies pieces around it are captured."
-    # Set up some convenient variables
+def get_nice_variables(board_array: np.array,
+                       index: tuple,
+                       ) -> tuple:
+    """Return some convenient variable used in multiple game utilities"""
     row, col = index
     teams = {0: 1, 1: 2, 2: 2}
     size = board_array.shape[-1] - 1
     hostile = [(0, 0), (0, size), (size, 0), (size, size)]
+    plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
+    ally = teams[plane]
+    return row, col, teams, size, hostile, plane, ally
+
+
+def check_capture(board_array: np.array,
+                  index: tuple,
+                  ) -> None:
+    """Given an index, checks to see if any basic enemies pieces around it are captured."""
+    # Set up some convenient variables
+    row, col, teams, size, hostile, plane, ally = get_nice_variables(board_array, index)
+
     # If the throne is empty, it is hostile
     if not board_array[:, size // 2, size // 2].any():
         hostile.append((size // 2, size // 2))
-
-    # What is the piece type? What team is it?
-    plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
-    ally = teams[plane]
 
     # Set up some convenient anonymous functions
     is_piece = lambda row, col: board_array[:, row, col].any()
@@ -114,18 +133,16 @@ def check_capture(board_array: np.array,
 
 def capture_tags(board_array: np.array,
                  tags: list,
-                ) -> None:
+                 ) -> None:
     for tag in tags:
         if np.argwhere(board_array[:, tag[0], tag[1]] == 1).item() != 2:
             board_array[:, tag[0], tag[1]] = 0
 
 
 def check_shield_wall(board_array, index, tags, edge=None):
-    "Recursively check whether a shield wall capture can be executed."
-    row, col = index
-    teams = {0: 1, 1: 2, 2: 2}
-    size = board_array.shape[-1] - 1
-    hostile = [(0, 0), (0, size), (size, 0), (size, size)]
+    """Recursively check whether a shield wall capture can be executed."""
+    row, col, teams, size, hostile, plane, ally = get_nice_variables(board_array, index)
+
     if not edge:
         if row == 0:
             edge = 'up'
@@ -135,10 +152,6 @@ def check_shield_wall(board_array, index, tags, edge=None):
             edge = 'left'
         else:
             edge = 'right'
-
-    # What is this piece type? What team is it?
-    plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
-    ally = teams[plane]
 
     is_piece = lambda row, col: board_array[:, row, col].any()
     is_ally = lambda row, col: teams[np.argwhere(board_array[:, row, col] == 1).item()] == ally
@@ -152,8 +165,10 @@ def check_shield_wall(board_array, index, tags, edge=None):
     h_dir = h_mapping[edge]
     b_dirs = b_mapping[edge]
 
-    if is_hostile(h_dir[0], h_dir[1]) and not_blank(b_dirs[0][0], b_dirs[0][1]) and not_blank(b_dirs[1][0],
-                                                                                              b_dirs[1][1]):
+    if (is_hostile(h_dir[0], h_dir[1]) and
+        not_blank(b_dirs[0][0], b_dirs[0][1]) and
+        not_blank(b_dirs[1][0], b_dirs[1][1])
+    ):
         tags.append(index)
         adjacent_friends = []
         if is_ally(b_dirs[0][0], b_dirs[0][1]) and (b_dirs[0][0], b_dirs[0][1]) not in tags:
@@ -170,13 +185,19 @@ def check_shield_wall(board_array, index, tags, edge=None):
 
 def check_king(board_array: np.array,
                ) -> int:
+    """
+    Check whether the King has escaped or been captured.
+
+    :param np.array board_array: A 2D NumPy array representing the board
+    :return: -1 means King captured, 1 means King escaped, 0 means neither.
+    """
     size = board_array.shape[-1] - 1
     row, col = tuple(np.argwhere(board_array[2, :, :] == 1)[0])
     corners = [(0, 0), (0, size), (size, 0), (size, size)]
     throne = (size / 2, size / 2)
     teams = {0: 1, 1: 2, 2: 2}
     is_hostile = lambda row, col: (row, col) == throne or (
-                board_array[:, row, col].any() and teams[np.argwhere(board_array[:, row, col] == 1).item()] != 2)
+            board_array[:, row, col].any() and teams[np.argwhere(board_array[:, row, col] == 1).item()] != 2)
 
     # Has the King escaped?
     if (row, col) in corners:
