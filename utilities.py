@@ -87,13 +87,14 @@ def check_capture(board_array: np.array,
     if not board_array[:, size // 2, size // 2].any():
         hostile.append((size // 2, size // 2))
 
-    # Set up some convenient anonymous functions
-    is_piece = lambda row, col: board_array[:, row, col].any()
-    is_enemy = lambda row, col: is_piece(row, col) and np.argwhere(board_array[:, row, col] == 1).item() not in [plane,
-                                                                                                                 2]
-    is_flanked = lambda row, col: (is_piece(row, col) and teams[
-        np.argwhere(board_array[:, row, col] == 1).item()] == ally) or (row, col) in hostile
-    is_edge = lambda row, col: row == 0 or col == 0 or row == size or col == size
+    # Set up some convenient anonymous functions to check conditions
+    is_piece = lambda r, c: board_array[:, r, c].any()
+    is_enemy = lambda r, c: (is_piece(r, c) and
+                             np.argwhere(board_array[:, r, c] == 1).item() not in [plane, 2])
+    is_flanked = lambda r, c: ((is_piece(r, c) and
+                                teams[np.argwhere(board_array[:, r, c] == 1).item()] == ally) or
+                               (r, c) in hostile)
+    is_edge = lambda r, c: r == 0 or c == 0 or r == size or c == size
 
     # If our piece isn't on the upper edge and there is an enemy above it...
     if row > 0 and is_enemy(row - 1, col):
@@ -153,11 +154,12 @@ def check_shield_wall(board_array, index, tags, edge=None):
         else:
             edge = 'right'
 
-    is_piece = lambda row, col: board_array[:, row, col].any()
-    is_ally = lambda row, col: teams[np.argwhere(board_array[:, row, col] == 1).item()] == ally
-    not_blank = lambda row, col: board_array[:, row, col].any() or (row, col) in hostile
-    is_hostile = lambda row, col: (is_piece(row, col) and teams[
-        np.argwhere(board_array[:, row, col] == 1).item()] != ally) or (row, col) in hostile
+    is_piece = lambda r, c: board_array[:, r, c].any()
+    is_ally = lambda r, c: teams[np.argwhere(board_array[:, r, c] == 1).item()] == ally
+    not_blank = lambda r, c: board_array[:, r, c].any() or (r, c) in hostile
+    is_hostile = lambda r, c: ((is_piece(r, c) and
+                                teams[np.argwhere(board_array[:, r, c] == 1).item()] != ally) or
+                                (r, c) in hostile)
 
     h_mapping = {'up': (row + 1, col), 'down': (row - 1, col), 'left': (row, col + 1), 'right': (row, col - 1)}
     b_mapping = {'up': ((row, col - 1), (row, col + 1)), 'down': ((row, col - 1), (row, col + 1)),
@@ -166,8 +168,8 @@ def check_shield_wall(board_array, index, tags, edge=None):
     b_dirs = b_mapping[edge]
 
     if (is_hostile(h_dir[0], h_dir[1]) and
-        not_blank(b_dirs[0][0], b_dirs[0][1]) and
-        not_blank(b_dirs[1][0], b_dirs[1][1])
+            not_blank(b_dirs[0][0], b_dirs[0][1]) and
+            not_blank(b_dirs[1][0], b_dirs[1][1])
     ):
         tags.append(index)
         adjacent_friends = []
