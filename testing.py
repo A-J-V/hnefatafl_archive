@@ -62,4 +62,22 @@ def run_tests():
     assert (b.board_array[:, 10, 6].any()), \
         "Expected the King to remain at (10, 6), because it can't be captured by a shield wall."
 
+    # A group of four defenders is pinned in a shield wall on the left edge between attackers and a corner.
+    # All four defenders should be captured upon checking.
+    b = TaflBoard(tb['instant_capture_shield_wall_1_1'])
+    check_capture(b.board_array, (1, 1))
+    assert not (b.board_array[:, 1, 0].any()), \
+        "Expected the piece at (1, 0) to be captured, because it was caught in a shield wall."
+    assert not (b.board_array[:, 2, 0].any()), \
+        "Expected the piece at (2, 0) to be captured, because it was caught in a shield wall."
+    assert not (b.board_array[:, 3, 0].any()), \
+        "Expected the piece at (3, 0) to be captured, because it was caught in a shield wall."
+    assert not (b.board_array[:, 4, 0].any()), \
+        "Expected the piece at (4, 0) to be captured, because it was caught in a shield wall."
+
+    b = TaflBoard(tb['instant_capture_1_6'])
+    check_capture(b.board_array, (1, 6))
+    assert not (b.board_array[:, 1, 7].any()), \
+        "Expected the defender at (1, 7) to be captured, because it was flanked by two attackers."
+
     print("All tests finished.")

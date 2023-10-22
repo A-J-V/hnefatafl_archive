@@ -66,7 +66,7 @@ def make_move(board_array: np.array,
 def get_nice_variables(board_array: np.array,
                        index: tuple,
                        ) -> tuple:
-    """Return some convenient variable used in multiple game utilities"""
+    """Return some convenient variables used in multiple game utilities"""
     row, col = index
     teams = {0: 1, 1: 2, 2: 2}
     size = board_array.shape[-1] - 1
@@ -96,7 +96,7 @@ def check_capture(board_array: np.array,
                                (r, c) in hostile)
     is_edge = lambda r, c: r == 0 or c == 0 or r == size or c == size
 
-    # If our piece isn't on the upper edge and there is an enemy above it...
+    # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
     if row > 0 and is_enemy(row - 1, col):
         if is_edge(row - 1, col):
             tags = []
@@ -155,7 +155,7 @@ def check_shield_wall(board_array, index, tags, edge=None):
             edge = 'right'
 
     is_piece = lambda r, c: board_array[:, r, c].any()
-    is_ally = lambda r, c: teams[np.argwhere(board_array[:, r, c] == 1).item()] == ally
+    is_ally = lambda r, c: is_piece(r, c) and teams[np.argwhere(board_array[:, r, c] == 1).item()] == ally
     not_blank = lambda r, c: board_array[:, r, c].any() or (r, c) in hostile
     is_hostile = lambda r, c: ((is_piece(r, c) and
                                 teams[np.argwhere(board_array[:, r, c] == 1).item()] != ally) or

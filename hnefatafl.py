@@ -20,10 +20,12 @@ A....D....A
 class TaflBoard:
     def __init__(self, starting_board: str) -> None:
         """
-        Initialize the game board by taking a string representation of a Tafl board
-        and converting it into a NumPy array of stacked binary planes.
+        Create the game board.
+
+        Takes a string representation of a Tafl board and encodes it into a 3D NumPy array.
         The board being received must have length == width, and length must be an odd number.
-        :param starting_board: str
+
+        :param str starting_board:
         """
         assert len(starting_board.replace('\n',
                                           '')) ** 0.5 % 1 == 0, """The provided starting board
@@ -53,9 +55,9 @@ class TaflBoard:
 
     def display_moves(self, index: tuple) -> None:
         """
-        Print an attractively spaced ASCII representation of the map
-        with '+' showing valid moves for the given piece. (for debugging)
-        :param index: tuple containing (row, column) of piece whose valid moves we're checking.
+        Print an ASCII representation of the map  with '+' showing valid moves.
+
+        :param tuple index: A tuple (row, column) of the piece whose valid moves we're checking.
         """
         moves = get_moves(self.board_array, index)
         tmp = deepcopy(self.board_array)
