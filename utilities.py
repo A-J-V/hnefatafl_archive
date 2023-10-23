@@ -6,18 +6,26 @@ TEAMS = {0: 1, 1: 2, 2: 2}
 
 
 # Several small convenience functions that are used in multiple places for condition checks
-def is_piece(board_array, row, column):
+def is_piece(board, row, col):
     # This could cause an index out of bounds error!
-    return board_array[:, row, column].any()
+    return board[:, row, col].any()
+
+
+def is_king(board, row, col):
+    return np.argwhere(board[:, row, col] == 1) == 2
 
 
 def is_edge(row, col, size):
     return row == 0 or col == 0 or row == size or col == size
 
 
-def is_blank(board_array, row, col):
-    size = board_array.shape[-1] - 1
-    return (0 <= row <= size and 0 <= col <= size) and board_array[:, row, col].any()
+def in_bounds(row, col, size):
+    return 0 <= row <= size and 0 <= col <= size
+
+
+def is_blank(board, row, col):
+    size = board.shape[-1] - 1
+    return (0 <= row <= size and 0 <= col <= size) and board[:, row, col].any()
 
 
 def near_blank(board_array, row, col):
@@ -219,12 +227,16 @@ def check_shield_wall(board: np.array,
     return True
 
 
-def check_exit_fort(board_array: np.array) -> bool:
-    """Recursively check whether defenders have built an Exit Fort."""
-    row, col = tuple(np.argwhere(board_array[2, :, :] == 1)[0])
-    size = board_array.shape[-1]
-    if not (is_edge(row, col, size) and near_blank(board_array, row, col)):
-        return False
+def check_fort(board, index, defender_tags, interior_tags):
+    row, col = index
+    size= board.shape[-1] - 1
+    interior_tags.append(index)
+    adjacent_interior = []
+    for dir in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+        if not in_bounds(row + dir[0], col + dir[1], size):
+            continue
+        elif is_blank(board, row + dir[0], col + dir[1]):
+            pass
 
     return True
 

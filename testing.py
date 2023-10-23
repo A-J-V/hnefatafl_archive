@@ -102,4 +102,10 @@ def run_tests():
     assert not (b.board_array[:, 1, 7].any()), \
         "Expected the defender at (1, 7) to be captured, because it was flanked by two attackers."
 
+    b = TaflBoard(tb['king_5_5'])
+    assert is_king(b.board_array, 5, 5), "Expected to recognize the King at (5, 5), but did not."
+
+    b = TaflBoard(tb['king_5_10'])
+    assert is_king(b.board_array, 5, 10), "Expected to recognize the King at (5, 10), but did not."
+
     print("All tests finished.")
