@@ -108,4 +108,22 @@ def run_tests():
     b = TaflBoard(tb['king_5_10'])
     assert is_king(b.board_array, 5, 10), "Expected to recognize the King at (5, 10), but did not."
 
+    b = TaflBoard(tb['fort_not_exit_fort_5_10'])
+    defender_tags = []
+    interior_tags = []
+    assert check_fort(b.board_array, (5, 10), defender_tags, interior_tags), \
+        "Expected the King at (5, 10) to be considered in a (non-exit) fort, but it was not."
+
+    b = TaflBoard(tb['fort_not_exit_fort_10_3'])
+    defender_tags = []
+    interior_tags = []
+    assert check_fort(b.board_array, (10, 3), defender_tags, interior_tags), \
+        "Expected the King at (10, 3) to be considered in a (non-exit) fort, but it was not."
+
+    b = TaflBoard(tb['no_fort_10_3'])
+    defender_tags = []
+    interior_tags = []
+    assert not check_fort(b.board_array, (10, 3), defender_tags, interior_tags), \
+        "Expected the King at (10, 3) to NOT be considered in a (non-exit) fort, but is was."
+
     print("All tests finished.")

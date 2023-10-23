@@ -15,6 +15,14 @@ def is_king(board, row, col):
     return np.argwhere(board[:, row, col] == 1) == 2
 
 
+def is_defender(board, row, col):
+    return np.argwhere(board[:, row, col] == 1) == 1
+
+
+def is_attacker(board, row, col):
+    return np.argwhere(board[:, row, col] == 1) == 0
+
+
 def is_edge(row, col, size):
     return row == 0 or col == 0 or row == size or col == size
 
@@ -25,7 +33,7 @@ def in_bounds(row, col, size):
 
 def is_blank(board, row, col):
     size = board.shape[-1] - 1
-    return (0 <= row <= size and 0 <= col <= size) and board[:, row, col].any()
+    return in_bounds(row, col, size) and not board[:, row, col].any()
 
 
 def near_blank(board_array, row, col):
@@ -228,16 +236,26 @@ def check_shield_wall(board: np.array,
 
 
 def check_fort(board, index, defender_tags, interior_tags):
+    """Check whether the King is in an edge fort."""
     row, col = index
-    size= board.shape[-1] - 1
+    size = board.shape[-1] - 1
     interior_tags.append(index)
     adjacent_interior = []
-    for dir in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
-        if not in_bounds(row + dir[0], col + dir[1], size):
+    for step in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        if not in_bounds(row + step[0], col + step[1], size):
             continue
-        elif is_blank(board, row + dir[0], col + dir[1]):
-            pass
+        elif is_blank(board, row + step[0], col + step[1]) or is_king(board, row + step[0], col + step[1]):
+            if (row + step[0], col + step[1]) not in interior_tags:
+                adjacent_interior.append((row + step[0], col + step[1]))
+        elif is_defender(board, row + step[0], col + step[1]):
+            if (row + step[0], col + step[1]) not in defender_tags:
+                defender_tags.append((row + step[0], col + step[1]))
+        else:
+            return False
 
+    for tile in adjacent_interior:
+        if not check_fort(board, tile, defender_tags, interior_tags):
+            return False
     return True
 
 
