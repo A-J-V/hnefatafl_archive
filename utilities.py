@@ -1,6 +1,35 @@
 import numpy as np
 
 
+# This is a global constant that maps piece planes to team
+TEAMS = {0: 1, 1: 2, 2: 2}
+
+
+# Several small convenience functions that are used in multiple places for condition checks
+def is_piece(board_array, row, column):
+    # This could cause an index out of bounds error!
+    return board_array[:, row, column].any()
+
+
+def is_edge(row, col, size):
+    return row == 0 or col == 0 or row == size or col == size
+
+
+def is_blank(board_array, row, col):
+    size = board_array.shape[-1] - 1
+    return (0 <= row <= size and 0 <= col <= size) and board_array[:, row, col].any()
+
+
+def near_blank(board_array, row, col):
+    return (is_blank(board_array, row - 1, col) or is_blank(board_array, row + 1, col) or
+            is_blank(board_array, row, col - 1) or is_blank(board_array, row, col + 1))
+
+
+def is_ally(board_array, row, column, ally):
+    return is_piece(board_array, row, column) and TEAMS[np.argwhere(board_array[:, row, column] == 1).item()] == ally
+# The group of small convenience functions ends here
+
+
 def get_moves(board_array: np.array,
               index: tuple,
               ) -> np.array:
@@ -76,23 +105,22 @@ def get_nice_variables(board_array: np.array,
     return row, col, teams, size, hostile, plane, ally
 
 
-def check_capture(board_array: np.array,
+def check_capture(board: np.array,
                   index: tuple,
                   ) -> None:
     """Given an index, checks to see if any basic enemies pieces around it are captured."""
     # Set up some convenient variables
-    row, col, teams, size, hostile, plane, ally = get_nice_variables(board_array, index)
+    row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
 
     # If the throne is empty, it is hostile
-    if not board_array[:, size // 2, size // 2].any():
+    if not board[:, size // 2, size // 2].any():
         hostile.append((size // 2, size // 2))
 
     # Set up some convenient anonymous functions to check conditions
-    is_piece = lambda r, c: board_array[:, r, c].any()
-    is_enemy = lambda r, c: (is_piece(r, c) and
-                             np.argwhere(board_array[:, r, c] == 1).item() not in [plane, 2])
-    is_flanked = lambda r, c: ((is_piece(r, c) and
-                                teams[np.argwhere(board_array[:, r, c] == 1).item()] == ally) or
+    is_enemy = lambda r, c: (is_piece(board, r, c) and
+                             np.argwhere(board[:, r, c] == 1).item() not in [plane, 2])
+    is_flanked = lambda r, c: ((is_piece(board, r, c) and
+                                teams[np.argwhere(board[:, r, c] == 1).item()] == ally) or
                                (r, c) in hostile)
     is_edge = lambda r, c: r == 0 or c == 0 or r == size or c == size
 
@@ -100,36 +128,36 @@ def check_capture(board_array: np.array,
     if row > 0 and is_enemy(row - 1, col):
         if is_edge(row - 1, col):
             tags = []
-            if check_shield_wall(board_array, (row - 1, col), tags):
-                capture_tags(board_array, tags)
+            if check_shield_wall(board, (row - 1, col), tags):
+                capture_tags(board, tags)
         # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
         if row - 2 >= 0 and is_flanked(row - 2, col):
             # Destroy it!
-            board_array[:, row - 1, col] = 0
+            board[:, row - 1, col] = 0
 
     if row < size and is_enemy(row + 1, col):
         if is_edge(row + 1, col):
             tags = []
-            if check_shield_wall(board_array, (row + 1, col), tags):
-                capture_tags(board_array, tags)
+            if check_shield_wall(board, (row + 1, col), tags):
+                capture_tags(board, tags)
         if row + 2 <= size and is_flanked(row + 2, col):
-            board_array[:, row + 1, col] = 0
+            board[:, row + 1, col] = 0
 
     if col > 0 and is_enemy(row, col - 1):
         if is_edge(row, col - 1):
             tags = []
-            if check_shield_wall(board_array, (row, col - 1), tags):
-                capture_tags(board_array, tags)
+            if check_shield_wall(board, (row, col - 1), tags):
+                capture_tags(board, tags)
         if col - 2 >= 0 and is_flanked(row, col - 2):
-            board_array[:, row, col - 1] = 0
+            board[:, row, col - 1] = 0
 
     if col < size and is_enemy(row, col + 1):
         if is_edge(row, col + 1):
             tags = []
-            if check_shield_wall(board_array, (row, col + 1), tags):
-                capture_tags(board_array, tags)
+            if check_shield_wall(board, (row, col + 1), tags):
+                capture_tags(board, tags)
         if col + 2 <= size and is_flanked(row, col + 2):
-            board_array[:, row, col + 1] = 0
+            board[:, row, col + 1] = 0
 
 
 def capture_tags(board_array: np.array,
@@ -140,9 +168,13 @@ def capture_tags(board_array: np.array,
             board_array[:, tag[0], tag[1]] = 0
 
 
-def check_shield_wall(board_array, index, tags, edge=None):
+def check_shield_wall(board: np.array,
+                      index: tuple,
+                      tags: list,
+                      edge: str='',
+                      ) -> bool:
     """Recursively check whether a shield wall capture can be executed."""
-    row, col, teams, size, hostile, plane, ally = get_nice_variables(board_array, index)
+    row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
 
     if not edge:
         if row == 0:
@@ -154,12 +186,11 @@ def check_shield_wall(board_array, index, tags, edge=None):
         else:
             edge = 'right'
 
-    is_piece = lambda r, c: board_array[:, r, c].any()
-    is_ally = lambda r, c: is_piece(r, c) and teams[np.argwhere(board_array[:, r, c] == 1).item()] == ally
-    not_blank = lambda r, c: board_array[:, r, c].any() or (r, c) in hostile
-    is_hostile = lambda r, c: ((is_piece(r, c) and
-                                teams[np.argwhere(board_array[:, r, c] == 1).item()] != ally) or
-                                (r, c) in hostile)
+    is_ally = lambda r, c: is_piece(board, r, c) and teams[np.argwhere(board[:, r, c] == 1).item()] == ally
+    not_blank = lambda r, c: board[:, r, c].any() or (r, c) in hostile
+    is_hostile = lambda r, c: ((is_piece(board, r, c) and
+                                teams[np.argwhere(board[:, r, c] == 1).item()] != ally) or
+                               (r, c) in hostile)
 
     h_mapping = {'up': (row + 1, col), 'down': (row - 1, col), 'left': (row, col + 1), 'right': (row, col - 1)}
     b_mapping = {'up': ((row, col - 1), (row, col + 1)), 'down': ((row, col - 1), (row, col + 1)),
@@ -168,8 +199,8 @@ def check_shield_wall(board_array, index, tags, edge=None):
     b_dirs = b_mapping[edge]
 
     if (is_hostile(h_dir[0], h_dir[1]) and
-            not_blank(b_dirs[0][0], b_dirs[0][1]) and
-            not_blank(b_dirs[1][0], b_dirs[1][1])
+        not_blank(b_dirs[0][0], b_dirs[0][1]) and
+        not_blank(b_dirs[1][0], b_dirs[1][1])
     ):
         tags.append(index)
         adjacent_friends = []
@@ -178,10 +209,20 @@ def check_shield_wall(board_array, index, tags, edge=None):
         if is_ally(b_dirs[1][0], b_dirs[1][1]) and (b_dirs[1][0], b_dirs[1][1]) not in tags:
             adjacent_friends.append((b_dirs[1][0], b_dirs[1][1]))
         for ally in adjacent_friends:
-            if not check_shield_wall(board_array, ally, tags, edge):
+            if not check_shield_wall(board, ally, tags, edge):
                 return False
     else:
         return False
+    return True
+
+
+def check_exit_fort(board_array: np.array) -> bool:
+    """Recursively check whether defenders have built an Exit Fort."""
+    row, col = tuple(np.argwhere(board_array[2, :, :] == 1)[0])
+    size = board_array.shape[-1]
+    if not (is_edge(row, col, size) and near_blank(board_array, row, col)):
+        return False
+
     return True
 
 
@@ -206,10 +247,10 @@ def check_king(board_array: np.array,
         return 1
 
     # Is the king surrounded?
-    if ((row - 1 > 0 and is_hostile(row - 1, col)) and
-            (row + 1 <= size and is_hostile(row + 1, col)) and
-            (col - 1 > 0 and is_hostile(row, col - 1)) and
-            (col + 1 <= size and is_hostile(row, col + 1))
-    ):
+    if ((row - 1 > 0     and is_hostile(row - 1, col)) and
+        (row + 1 <= size and is_hostile(row + 1, col)) and
+        (col - 1 > 0     and is_hostile(row, col - 1)) and
+        (col + 1 <= size and is_hostile(row, col + 1))
+       ):
         return -1
     return 0

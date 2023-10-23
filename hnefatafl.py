@@ -34,7 +34,7 @@ class TaflBoard:
         a_plane = np.array([[1 if i == 'A' else 0 for i in list(c)] for c in starting_board.splitlines()])
         d_plane = np.array([[1 if i == 'D' else 0 for i in list(c)] for c in starting_board.splitlines()])
         k_plane = np.array([[1 if i == 'K' else 0 for i in list(c)] for c in starting_board.splitlines()])
-        # Stack the planes into an array, M x N x N, where N is board length/width and M is number of piece types)
+        # Stack the planes into an array, M x N x N, where N is board length/width and M is number of piece types
         self.board_array = np.stack([a_plane, d_plane, k_plane])
         self.game_over = False
 
@@ -72,4 +72,3 @@ class TaflBoard:
                 i += 1
         tmp = self.__repr__(tmp)
         print(tmp)
-
