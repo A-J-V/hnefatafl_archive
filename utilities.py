@@ -27,6 +27,10 @@ def is_edge(row, col, size):
     return row == 0 or col == 0 or row == size or col == size
 
 
+def is_corner(row, col, size):
+    return (row, col) == (0, 0) or (row, col) == (0, size) or (row, col) == (size, 0) or (row, col) == (size, size)
+
+
 def in_bounds(row, col, size):
     return 0 <= row <= size and 0 <= col <= size
 
@@ -235,7 +239,7 @@ def check_shield_wall(board: np.array,
     return True
 
 
-def check_fort(board, index, defender_tags, interior_tags):
+def is_fort(board, index, defender_tags, interior_tags):
     """Check whether the King is in an edge fort."""
     row, col = index
     size = board.shape[-1] - 1
@@ -254,8 +258,33 @@ def check_fort(board, index, defender_tags, interior_tags):
             return False
 
     for tile in adjacent_interior:
-        if not check_fort(board, tile, defender_tags, interior_tags):
+        if not is_fort(board, tile, defender_tags, interior_tags):
             return False
+    return True
+
+
+def is_impenetrable(board, defender_tags, interior_tags):
+    size = board.shape[-1]
+
+    def vertical_vuln(r, c, size):
+        if ((not in_bounds(r - 1, c, size) or is_defender(board, r - 1, c) or (r - 1, c) in interior_tags) or
+           (not in_bounds(r + 1, c, size) or is_defender(board, r + 1, c) or (r + 1, c) in interior_tags)):
+            return False
+        else:
+            return True
+
+    def horizontal_vuln(r, c, size):
+        if ((not in_bounds(r, c - 1, size) or is_defender(board, r, c - 1) or (r, c - 1) in interior_tags) or
+           (not in_bounds(r, c + 1, size) or is_defender(board, r, c + 1) or (r, c + 1) in interior_tags)):
+            return False
+        else:
+            return True
+
+    for defender in defender_tags:
+        row, col = defender
+        if vertical_vuln(row, col, size) or horizontal_vuln(row, col, size):
+            return False
+
     return True
 
 

@@ -111,19 +111,53 @@ def run_tests():
     b = TaflBoard(tb['fort_not_exit_fort_5_10'])
     defender_tags = []
     interior_tags = []
-    assert check_fort(b.board_array, (5, 10), defender_tags, interior_tags), \
+    assert is_fort(b.board_array, (5, 10), defender_tags, interior_tags), \
         "Expected the King at (5, 10) to be considered in a (non-exit) fort, but it was not."
 
     b = TaflBoard(tb['fort_not_exit_fort_10_3'])
     defender_tags = []
     interior_tags = []
-    assert check_fort(b.board_array, (10, 3), defender_tags, interior_tags), \
+    assert is_fort(b.board_array, (10, 3), defender_tags, interior_tags), \
         "Expected the King at (10, 3) to be considered in a (non-exit) fort, but it was not."
+    assert not is_impenetrable(b.board_array, defender_tags, interior_tags), \
+        "Expected the fort around (10, 3) to be penetrable, but it was deemed impenetrable."
 
     b = TaflBoard(tb['no_fort_10_3'])
     defender_tags = []
     interior_tags = []
-    assert not check_fort(b.board_array, (10, 3), defender_tags, interior_tags), \
+    assert not is_fort(b.board_array, (10, 3), defender_tags, interior_tags), \
         "Expected the King at (10, 3) to NOT be considered in a (non-exit) fort, but is was."
+
+    b = TaflBoard(tb['exit_fort_10_5'])
+    defender_tags = []
+    interior_tags = []
+    assert is_fort(b.board_array, (10, 5), defender_tags, interior_tags), \
+        "Expected the King at (10, 5) to be considered in a fort, but it was not."
+    assert is_impenetrable(b.board_array, defender_tags, interior_tags), \
+        "Expected the fort around (10, 5) to be impenetrable, but it was deemed penetrable."
+
+    b = TaflBoard(tb['exit_fort_0_4'])
+    defender_tags = []
+    interior_tags = []
+    assert is_fort(b.board_array, (0, 4), defender_tags, interior_tags), \
+        "Expected the King at (0, 4) to be considered in a fort, but it was not."
+    assert is_impenetrable(b.board_array, defender_tags, interior_tags), \
+        "Expected the fort around (0, 4) to be impenetrable, but it was deemed penetrable."
+
+    b = TaflBoard(tb['exit_fort_6_0'])
+    defender_tags = []
+    interior_tags = []
+    assert is_fort(b.board_array, (6, 0), defender_tags, interior_tags), \
+        "Expected the King at (6, 0) to be considered in a fort, but it was not."
+    assert is_impenetrable(b.board_array, defender_tags, interior_tags), \
+        "Expected the fort around (6, 0) to be impenetrable, but it was deemed penetrable."
+
+    b = TaflBoard(tb['exit_fort_2_0'])
+    defender_tags = []
+    interior_tags = []
+    assert is_fort(b.board_array, (2, 0), defender_tags, interior_tags), \
+        "Expected the King at (2, 0) to be considered in a fort, but it was not."
+    assert is_impenetrable(b.board_array, defender_tags, interior_tags), \
+        "Expected the fort around (2, 0) to be impenetrable, but it was deemed penetrable."
 
     print("All tests finished.")
