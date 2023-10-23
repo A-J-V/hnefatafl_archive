@@ -75,6 +75,28 @@ def run_tests():
     assert not (b.board_array[:, 4, 0].any()), \
         "Expected the piece at (4, 0) to be captured, because it was caught in a shield wall."
 
+    # A group of three defenders is ALMOST pinned in a shield wall on the left edge, but not yet enclosed.
+    # All three defenders should NOT be captured upon checking.
+    b = TaflBoard(tb['no_capture_shield_wall_2_1'])
+    check_capture(b.board_array, (2, 1))
+    assert (b.board_array[:, 2, 0].any()), \
+        "Expected the piece at (2, 0) to NOT be captured, because the shield wall isn't closed."
+    assert (b.board_array[:, 3, 0].any()), \
+        "Expected the piece at (3, 0) to NOT be captured, because the shield wall isn't closed."
+    assert (b.board_array[:, 4, 0].any()), \
+        "Expected the piece at (4, 0) to NOT be captured, because the shield wall isn't closed."
+
+    # A group of two attackers is pinned in a shield wall on the top edge between defenders.
+    # Both attackers should be captured upon checking.
+    b = TaflBoard(tb['instant_capture_shield_wall_0_3'])
+    check_capture(b.board_array, (0, 3))
+    assert not (b.board_array[:, 0, 4].any()), \
+        "Expected the piece at (0, 4) to be captured, because it was caught in a shield wall."
+    assert not (b.board_array[:, 0, 5].any()), \
+        "Expected the piece at (0, 5) to be captured, because it was caught in a shield wall."
+    assert (b.board_array[:, 0, 7].any()), \
+        "Expected the piece at (0, 7) to not be captured, because it was outside the shield wall."
+
     b = TaflBoard(tb['instant_capture_1_6'])
     check_capture(b.board_array, (1, 6))
     assert not (b.board_array[:, 1, 7].any()), \
