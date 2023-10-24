@@ -18,7 +18,7 @@ A....D....A
 
 
 class TaflBoard:
-    def __init__(self, starting_board: str) -> None:
+    def __init__(self, starting_board: str=starting_board) -> None:
         """
         Create the game board.
 
@@ -35,13 +35,13 @@ class TaflBoard:
         d_plane = np.array([[1 if i == 'D' else 0 for i in list(c)] for c in starting_board.splitlines()])
         k_plane = np.array([[1 if i == 'K' else 0 for i in list(c)] for c in starting_board.splitlines()])
         # Stack the planes into an array, M x N x N, where N is board length/width and M is number of piece types
-        self.board_array = np.stack([a_plane, d_plane, k_plane])
+        self.board = np.stack([a_plane, d_plane, k_plane])
         self.game_over = False
 
     def __repr__(self, board_array: np.array = None) -> str:
         """Return a more human-readable string of the game board."""
         if board_array is None:
-            board_array = self.board_array
+            board_array = self.board
         tmp = deepcopy(board_array)
         for i in range(3):
             tmp[i, :, :] *= (i + 1)
@@ -59,8 +59,8 @@ class TaflBoard:
 
         :param tuple index: A tuple (row, column) of the piece whose valid moves we're checking.
         """
-        moves = get_moves(self.board_array, index)
-        tmp = deepcopy(self.board_array)
+        moves = get_moves(self.board, index)
+        tmp = deepcopy(self.board)
         for k, instruction in enumerate([(0, -1), (0, 1), (1, -1), (1, 1)]):
             axis, direction = instruction
             tmp_index = list(index)
