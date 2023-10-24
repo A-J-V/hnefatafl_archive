@@ -60,7 +60,7 @@ def is_hostile(board, row, col, ally, hostile):
 # The group of small convenience functions ends here
 
 
-def get_moves(board_array: np.array,
+def get_moves(board: np.array,
               index: tuple,
               ) -> np.array:
     """
@@ -71,16 +71,16 @@ def get_moves(board_array: np.array,
     Indices 0-9 encode "move up 1-10 spaces", indices 10-19 encode "move down 1-10 spaces",
     Indices 20-29 encode "move left 1-10 spaces", indices 30-39 encode "move right 1-10 spaces".
 
-    :param np.array board_array: a 2D NumPy array representing the board
+    :param np.array board: a 2D NumPy array representing the board
     :param tuple index: a tuple(int, int) representing the index of the piece whose legal moves we're checking.
     :return: A 1D binary NumPy array of length 40 representing legal moves
     """
-    size = board_array.shape[-1] - 1
+    size = board.shape[-1] - 1
     restricted = [(0, 0), (0, size), (size, 0), (size, size), (size//2, size//2)]
     legal_moves = np.zeros(40)
     dirty_indices = []
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
-    if not board_array[:, index[0], index[1]].any():
+    if not board[:, index[0], index[1]].any():
         return legal_moves
     # Need to go through the 40 possible moves and check the legality of each...
     # 0-9 is up 1-10, 10-19 is down 1-10, 20-29 is left 1-10, 30-39 is right 1-10
@@ -94,11 +94,11 @@ def get_moves(board_array: np.array,
         i = k * 10
         while i < (k + 1) * 10 and safe[direction](tmp_index[axis]):
             tmp_index[axis] += direction
-            if not board_array[:, tmp_index[0], tmp_index[1]].any():
+            if not board[:, tmp_index[0], tmp_index[1]].any():
                 # No blocking piece
-                if tuple(tmp_index) not in restricted or is_king(board_array, index[0], index[1]):
+                if tuple(tmp_index) not in restricted or is_king(board, index[0], index[1]):
                     legal_moves[i] = 1
-            elif board_array[:, tmp_index[0], tmp_index[1]].any():
+            elif board[:, tmp_index[0], tmp_index[1]].any():
                 # Blocking piece
                 dirty_indices.append((tmp_index[0], tmp_index[1]))
                 break
