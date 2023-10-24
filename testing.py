@@ -238,4 +238,44 @@ def run_tests():
                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
 
+    b = TaflBoard(tb['defenders_no_moves'])
+    assert not has_moves(b.board, 'defenders'), \
+        "Expected defenders to have no legal moves, but they did."
+
+    b = TaflBoard(tb['defenders_no_moves_2'])
+    assert not has_moves(b.board, 'defenders'), \
+        "Expected defenders to have no legal moves, but they did."
+
+    b = TaflBoard(tb['defenders_no_moves_3'])
+    assert not has_moves(b.board, 'defenders'), \
+        "Expected defenders to have no legal moves, but they did."
+
+    b = TaflBoard(tb['defenders_has_moves'])
+    assert has_moves(b.board, 'defenders'), \
+        "Expected defenders to have legal moves, but they did not."
+
+    b = TaflBoard(tb['defenders_has_moves_2'])
+    assert has_moves(b.board, 'defenders'), \
+        "Expected defenders to have legal moves, but they did not."
+
+    b = TaflBoard(tb['defenders_has_moves_3'])
+    assert has_moves(b.board, 'defenders'), \
+        "Expected defenders to have legal moves, but they did not."
+
+    b = TaflBoard(tb['defenders_has_moves_4'])
+    assert has_moves(b.board, 'defenders'), \
+        "Expected defenders to have legal moves, but they did not."
+
+    b = TaflBoard(tb['attackers_no_moves_1'])
+    assert not has_moves(b.board, 'attackers'), \
+        "Expected defenders to have no legal moves, but they did."
+
+    b = TaflBoard(tb['attackers_no_moves_2'])
+    assert not has_moves(b.board, 'attackers'), \
+        "Expected defenders to have no legal moves, but they did."
+
+    b = TaflBoard(tb['defenders_has_moves_3'])
+    assert has_moves(b.board, 'defenders'), \
+        "Expected defenders to have legal moves, but they did not."
+
     print("All tests finished.")

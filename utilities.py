@@ -106,6 +106,25 @@ def get_moves(board: np.array,
     return legal_moves
 
 
+def get_action_space(board: np.array) -> np.array:
+    size = board.shape[-1]
+    action_space = np.zeros(shape=(40, size, size))
+    for r in range(size):
+        for c in range(size):
+            action_space[:, r, c] = get_moves(board, (r, c))
+    return action_space
+
+
+def has_moves(board: np.array, player='defenders'):
+    """Check whether a player has any legal moves."""
+    action_space = get_action_space(board)
+    if player == 'attackers':
+        mask = board[0, :, :] == 1
+    else:
+        mask = np.sum(board[1:, :, :], axis=0) == 1
+    return action_space[:, mask].any()
+
+
 def make_move(board_array: np.array,
               index: tuple,
               move: int,

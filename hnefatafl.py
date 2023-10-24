@@ -18,7 +18,7 @@ A....D....A
 
 
 class TaflBoard:
-    def __init__(self, starting_board: str=starting_board) -> None:
+    def __init__(self, starting_board: str = starting_board) -> None:
         """
         Create the game board.
 
