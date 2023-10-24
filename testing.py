@@ -163,14 +163,23 @@ def run_tests():
     b = TaflBoard(tb['encirclement_test_1'])
     assert check_encirclement(b.board_array), \
         "Expected encirclement to be True, but it was False."
+    attacker_walls, visited = verify_encirclement(b.board_array)
+    assert is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
+        "Expected encirclement to be impenetrable, but it was not."
 
     b = TaflBoard(tb['encirclement_test_2'])
     assert check_encirclement(b.board_array), \
         "Expected encirclement to be True, but it was False."
+    attacker_walls, visited = verify_encirclement(b.board_array)
+    assert is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
+        "Expected encirclement to be impenetrable, but it was not."
 
     b = TaflBoard(tb['encirclement_test_3'])
     assert check_encirclement(b.board_array), \
         "Expected encirclement to be True, but it was False."
+    attacker_walls, visited = verify_encirclement(b.board_array)
+    assert is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
+        "Expected encirclement to be impenetrable, but it was not."
 
     b = TaflBoard(tb['no_encirclement_test_1'])
     assert not check_encirclement(b.board_array), \
@@ -184,6 +193,25 @@ def run_tests():
     assert not check_encirclement(b.board_array), \
         "Expected encirclement to be False, but it was True."
 
+    b = TaflBoard(tb['partial_encirclement_test_1'])
+    assert check_encirclement(b.board_array), \
+        "Expected encirclement to be True, but it was False."
+    attacker_walls, visited = verify_encirclement(b.board_array)
+    assert not is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
+        "Expected encirclement to NOT be impenetrable, but it was."
 
+    b = TaflBoard(tb['partial_encirclement_test_2'])
+    assert check_encirclement(b.board_array), \
+        "Expected encirclement to be True, but it was False."
+    attacker_walls, visited = verify_encirclement(b.board_array)
+    assert not is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
+        "Expected encirclement to NOT be impenetrable, but it was."
+
+    b = TaflBoard(tb['partial_encirclement_test_3'])
+    assert check_encirclement(b.board_array), \
+        "Expected encirclement to be True, but it was False."
+    attacker_walls, visited = verify_encirclement(b.board_array)
+    assert not is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
+        "Expected encirclement to NOT be impenetrable, but it was."
 
     print("All tests finished.")

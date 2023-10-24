@@ -16,6 +16,10 @@ def is_king(board, row, col):
     return np.argwhere(board[:, row, col] == 1) == 2
 
 
+def find_king(board):
+    return tuple(np.argwhere(board[2, :, :] == 1)[0])
+
+
 def is_defender(board, row, col):
     return np.argwhere(board[:, row, col] == 1) == 1
 
@@ -265,26 +269,60 @@ def is_fort(board, index, defender_tags, interior_tags):
     return True
 
 
-def is_impenetrable(board, defender_tags, interior_tags):
+def verify_encirclement(board):
+    size = board.shape[-1] - 1
+    queue = deque()
+    visited = []
+    attacker_walls = []
+    interior_tiles = []
+    start_row, start_col = find_king(board)
+    queue.append((start_row, start_col))
+    visited.append((start_row, start_col))
+    interior_tiles.append((start_row, start_col))
+
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    while queue:
+        row, col = queue.popleft()
+        for dr, dc in directions:
+            nr, nc = row + dr, col + dc
+            if in_bounds(nr, nc, size) and (nr, nc) not in visited:
+                visited.append((nr, nc))
+                if is_defender(board, nr, nc) or is_blank(board, nr, nc):
+                    interior_tiles.append((nr, nc))
+                    queue.append((nr, nc))
+                elif is_attacker(board, nr, nc):
+                    attacker_walls.append((nr, nc))
+
+    return attacker_walls, interior_tiles
+
+
+def is_impenetrable(board, wall_tags, interior_tags, option='fort'):
     size = board.shape[-1]
+    if option == 'encirclement':
+        is_wall = is_attacker
+        is_safe = lambda r, c: (r, c) not in interior_tags
+    else:
+        is_wall = is_defender
+        is_safe = lambda r, c: (r, c) in interior_tags
 
-    def vertical_vuln(r, c, size):
-        if ((not in_bounds(r - 1, c, size) or is_defender(board, r - 1, c) or (r - 1, c) in interior_tags) or
-           (not in_bounds(r + 1, c, size) or is_defender(board, r + 1, c) or (r + 1, c) in interior_tags)):
+    def vertical_vuln(r, c):
+        if ((not in_bounds(r - 1, c, size) or is_wall(board, r - 1, c) or is_safe(r - 1, c)) or
+           (not in_bounds(r + 1, c, size) or is_wall(board, r + 1, c) or is_safe(r + 1, c))):
             return False
         else:
             return True
 
-    def horizontal_vuln(r, c, size):
-        if ((not in_bounds(r, c - 1, size) or is_defender(board, r, c - 1) or (r, c - 1) in interior_tags) or
-           (not in_bounds(r, c + 1, size) or is_defender(board, r, c + 1) or (r, c + 1) in interior_tags)):
+    def horizontal_vuln(r, c):
+        if ((not in_bounds(r, c - 1, size) or is_wall(board, r, c - 1) or is_safe(r, c - 1)) or
+           (not in_bounds(r, c + 1, size) or is_wall(board, r, c + 1) or is_safe(r, c + 1))):
             return False
         else:
             return True
 
-    for defender in defender_tags:
-        row, col = defender
-        if vertical_vuln(row, col, size) or horizontal_vuln(row, col, size):
+    for wall in wall_tags:
+        row, col = wall
+        if vertical_vuln(row, col) or horizontal_vuln(row, col):
             return False
 
     return True
