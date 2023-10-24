@@ -1,4 +1,5 @@
 import numpy as np
+from collections import deque
 
 
 # This is a global constant that maps piece planes to team
@@ -241,6 +242,7 @@ def check_shield_wall(board: np.array,
 
 def is_fort(board, index, defender_tags, interior_tags):
     """Check whether the King is in an edge fort."""
+    # This currently doesn't consider corners to be legal pieces of a fort, but it should.
     row, col = index
     size = board.shape[-1] - 1
     interior_tags.append(index)
@@ -284,6 +286,40 @@ def is_impenetrable(board, defender_tags, interior_tags):
         row, col = defender
         if vertical_vuln(row, col, size) or horizontal_vuln(row, col, size):
             return False
+
+    return True
+
+
+def check_encirclement(board):
+    size = board.shape[-1] - 1
+    queue = deque()
+    visited = []
+
+    for i in range(size + 1):
+        queue.append((i, 0))
+        queue.append((0, i))
+        queue.append((i, size))
+        queue.append((size, i))
+        visited.append((i, 0))
+        visited.append((0, i))
+        visited.append((i, size))
+        visited.append((size, i))
+
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+    while queue:
+        row, col = queue.popleft()
+        if is_attacker(board, row, col):
+            continue
+        for dr, dc in directions:
+            nr, nc = row + dr, col + dc
+
+            if in_bounds(nr, nc, size) and (nr, nc) not in visited:
+                visited.append((nr, nc))
+                if is_defender(board, nr, nc) or is_king(board, nr, nc):
+                    return False
+                elif is_blank(board, nr, nc):
+                    queue.append((nr, nc))
 
     return True
 

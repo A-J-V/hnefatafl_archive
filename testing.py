@@ -160,4 +160,30 @@ def run_tests():
     assert is_impenetrable(b.board_array, defender_tags, interior_tags), \
         "Expected the fort around (2, 0) to be impenetrable, but it was deemed penetrable."
 
+    b = TaflBoard(tb['encirclement_test_1'])
+    assert check_encirclement(b.board_array), \
+        "Expected encirclement to be True, but it was False."
+
+    b = TaflBoard(tb['encirclement_test_2'])
+    assert check_encirclement(b.board_array), \
+        "Expected encirclement to be True, but it was False."
+
+    b = TaflBoard(tb['encirclement_test_3'])
+    assert check_encirclement(b.board_array), \
+        "Expected encirclement to be True, but it was False."
+
+    b = TaflBoard(tb['no_encirclement_test_1'])
+    assert not check_encirclement(b.board_array), \
+        "Expected encirclement to be False, but it was True."
+
+    b = TaflBoard(tb['no_encirclement_test_2'])
+    assert not check_encirclement(b.board_array), \
+        "Expected encirclement to be False, but it was True."
+
+    b = TaflBoard(tb['no_encirclement_test_3'])
+    assert not check_encirclement(b.board_array), \
+        "Expected encirclement to be False, but it was True."
+
+
+
     print("All tests finished.")
