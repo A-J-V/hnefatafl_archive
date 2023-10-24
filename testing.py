@@ -214,4 +214,28 @@ def run_tests():
     assert not is_impenetrable(b.board_array, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to NOT be impenetrable, but it was."
 
+    b = TaflBoard(tb['legal_move_check_3_0'])
+    legal_moves = get_moves(b.board_array, (3, 0))
+    expected_moves = np.array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
+
+    b = TaflBoard(tb['legal_move_check_3_0_king'])
+    legal_moves = get_moves(b.board_array, (3, 0))
+    expected_moves = np.array([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
+
+    b = TaflBoard(tb['legal_move_check_5_1'])
+    legal_moves = get_moves(b.board_array, (5, 1))
+    expected_moves = np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0])
+    assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
+
+    b = TaflBoard(tb['legal_move_check_5_1_king'])
+    legal_moves = get_moves(b.board_array, (5, 1))
+    expected_moves = np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
+    assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
+
     print("All tests finished.")

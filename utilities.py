@@ -75,7 +75,8 @@ def get_moves(board_array: np.array,
     :param tuple index: a tuple(int, int) representing the index of the piece whose legal moves we're checking.
     :return: A 1D binary NumPy array of length 40 representing legal moves
     """
-    size = board_array.shape[-1]
+    size = board_array.shape[-1] - 1
+    restricted = [(0, 0), (0, size), (size, 0), (size, size), (size//2, size//2)]
     legal_moves = np.zeros(40)
     dirty_indices = []
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
@@ -84,7 +85,7 @@ def get_moves(board_array: np.array,
     # Need to go through the 40 possible moves and check the legality of each...
     # 0-9 is up 1-10, 10-19 is down 1-10, 20-29 is left 1-10, 30-39 is right 1-10
     # Two safety checks are necessary to prevent out of bounds errors.
-    safe = {-1: lambda x: x > 0, 1: lambda x: x < (size - 1)}
+    safe = {-1: lambda x: x > 0, 1: lambda x: x < size}
 
     # Directions are encoded as (row/column, increment/decrement) where row=0, column=1, increment=1, decrement=-1
     for k, instruction in enumerate([(0, -1), (0, 1), (1, -1), (1, 1)]):
@@ -95,7 +96,8 @@ def get_moves(board_array: np.array,
             tmp_index[axis] += direction
             if not board_array[:, tmp_index[0], tmp_index[1]].any():
                 # No blocking piece
-                legal_moves[i] = 1
+                if tuple(tmp_index) not in restricted or is_king(board_array, index[0], index[1]):
+                    legal_moves[i] = 1
             elif board_array[:, tmp_index[0], tmp_index[1]].any():
                 # Blocking piece
                 dirty_indices.append((tmp_index[0], tmp_index[1]))
