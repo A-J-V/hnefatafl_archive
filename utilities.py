@@ -1,7 +1,6 @@
 import numpy as np
 from collections import deque
 
-
 # This is a global constant that maps piece planes to team
 TEAMS = {0: 1, 1: 2, 2: 2}
 
@@ -57,6 +56,8 @@ def is_ally(board_array, row, column, ally):
 def is_hostile(board, row, col, ally, hostile):
     return ((is_piece(board, row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] != ally) or
             (row, col) in hostile)
+
+
 # The group of small convenience functions ends here
 
 
@@ -76,7 +77,7 @@ def get_moves(board: np.array,
     :return: A 1D binary NumPy array of length 40 representing legal moves
     """
     size = board.shape[-1] - 1
-    restricted = [(0, 0), (0, size), (size, 0), (size, size), (size//2, size//2)]
+    restricted = [(0, 0), (0, size), (size, 0), (size, size), (size // 2, size // 2)]
     legal_moves = np.zeros(40)
     dirty_indices = []
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
@@ -232,7 +233,7 @@ def capture_tags(board_array: np.array,
 def check_shield_wall(board: np.array,
                       index: tuple,
                       tags: list,
-                      edge: str='',
+                      edge: str = '',
                       ) -> bool:
     """Recursively check whether a shield wall capture can be executed."""
     row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
@@ -259,8 +260,8 @@ def check_shield_wall(board: np.array,
     b_dirs = b_mapping[edge]
 
     if (is_hostile(h_dir[0], h_dir[1]) and
-        not_blank(b_dirs[0][0], b_dirs[0][1]) and
-        not_blank(b_dirs[1][0], b_dirs[1][1])
+            not_blank(b_dirs[0][0], b_dirs[0][1]) and
+            not_blank(b_dirs[1][0], b_dirs[1][1])
     ):
         tags.append(index)
         adjacent_friends = []
@@ -330,7 +331,7 @@ def verify_encirclement(board):
 
 
 def is_impenetrable(board, wall_tags, interior_tags, option='fort'):
-    size = board.shape[-1]
+    size = board.shape[-1] - 1
     if option == 'encirclement':
         is_wall = is_attacker
         is_safe = lambda r, c: (r, c) not in interior_tags
@@ -340,14 +341,14 @@ def is_impenetrable(board, wall_tags, interior_tags, option='fort'):
 
     def vertical_vuln(r, c):
         if ((not in_bounds(r - 1, c, size) or is_wall(board, r - 1, c) or is_safe(r - 1, c)) or
-           (not in_bounds(r + 1, c, size) or is_wall(board, r + 1, c) or is_safe(r + 1, c))):
+                (not in_bounds(r + 1, c, size) or is_wall(board, r + 1, c) or is_safe(r + 1, c))):
             return False
         else:
             return True
 
     def horizontal_vuln(r, c):
         if ((not in_bounds(r, c - 1, size) or is_wall(board, r, c - 1) or is_safe(r, c - 1)) or
-           (not in_bounds(r, c + 1, size) or is_wall(board, r, c + 1) or is_safe(r, c + 1))):
+                (not in_bounds(r, c + 1, size) or is_wall(board, r, c + 1) or is_safe(r, c + 1))):
             return False
         else:
             return True
@@ -414,10 +415,46 @@ def check_king(board_array: np.array,
         return 1
 
     # Is the king surrounded?
-    if ((row - 1 > 0     and is_hostile(row - 1, col)) and
-        (row + 1 <= size and is_hostile(row + 1, col)) and
-        (col - 1 > 0     and is_hostile(row, col - 1)) and
-        (col + 1 <= size and is_hostile(row, col + 1))
-       ):
+    if ((row - 1 > 0 and is_hostile(row - 1, col)) and
+            (row + 1 <= size and is_hostile(row + 1, col)) and
+            (col - 1 > 0 and is_hostile(row, col - 1)) and
+            (col + 1 <= size and is_hostile(row, col + 1))
+    ):
         return -1
     return 0
+
+
+def is_terminal(board, player):
+    king_state = check_king(board)
+    if king_state == 1:
+        print("King escaped.")
+        return "defenders"
+    elif king_state == -1:
+        print("King captured.")
+        return "attackers"
+    elif player == "defenders":
+        king_r, king_c = find_king(board)
+        defender_tags = []
+        interior_tags = []
+        if (is_edge(king_r, king_c, board.shape[-1] - 1) and
+           is_fort(board, (king_r, king_c), defender_tags, interior_tags) and
+           is_impenetrable(board, defender_tags, interior_tags)):
+            print("Defenders have built an Exit Fort.")
+            return "defenders"
+    elif player == "attackers":
+        if check_encirclement(board):
+            attacker_walls, visited = verify_encirclement(board)
+            if is_impenetrable(board, attacker_walls, visited, option='encirclement'):
+                print("Attackers have formed an encirclement.")
+                return "attackers"
+
+    if not has_moves(board, "defenders"):
+        print("The defenders have no legal moves.")
+        return "attackers"
+    elif not has_moves(board, "attackers"):
+        print("The attackers have no legal moves.")
+        return "defenders"
+
+    # Does not check for draws
+    else:
+        return None
