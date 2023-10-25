@@ -278,4 +278,12 @@ def run_tests():
     assert has_moves(b.board, 'defenders'), \
         "Expected defenders to have legal moves, but they did not."
 
+    b = TaflBoard(tb['legal_move_test_4_3'])
+    moves = all_legal_moves(b.board, 'defenders')
+    assert np.sum(moves) == 4, "Expected exactly four legal moves for the defenders, but found something else."
+
+    b = TaflBoard(tb['legal_move_test_10_5'])
+    moves = all_legal_moves(b.board, 'defenders')
+    assert np.sum(moves) == 17, "Expected exactly 17 legal moves for the defenders, but found something else."
+
     print("All tests finished.")

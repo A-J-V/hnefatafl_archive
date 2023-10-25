@@ -12,4 +12,5 @@ if __name__ == "__main__":
     #display = graphics.initialize()
     #graphics.refresh(b.board, display)
     #time.sleep(5)
+    #input()
     run_tests()

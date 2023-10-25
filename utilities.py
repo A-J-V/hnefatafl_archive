@@ -115,7 +115,7 @@ def get_action_space(board: np.array) -> np.array:
     return action_space
 
 
-def has_moves(board: np.array, player='defenders'):
+def has_moves(board: np.array, player: str = 'defenders'):
     """Check whether a player has any legal moves."""
     action_space = get_action_space(board)
     if player == 'attackers':
@@ -123,6 +123,17 @@ def has_moves(board: np.array, player='defenders'):
     else:
         mask = np.sum(board[1:, :, :], axis=0) == 1
     return action_space[:, mask].any()
+
+
+def all_legal_moves(board: np.array, player: str = 'defenders'):
+    """Return the action-space of all legal moves for a single player"""
+    action_space = get_action_space(board)
+    if player == 'attackers':
+        mask = board[0, :, :] != 1
+    else:
+        mask = np.sum(board[1:, :, :], axis=0) != 1
+    action_space[:, mask] = 0
+    return action_space
 
 
 def make_move(board_array: np.array,
