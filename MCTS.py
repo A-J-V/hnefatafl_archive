@@ -1,4 +1,7 @@
 from utilities import *
+import random
+import graphics
+import time
 
 
 class Node:
@@ -12,7 +15,7 @@ class Node:
 
 
 def toggle_player(player):
-    return "defender" if player == "attacker" else "attacker"
+    return "defenders" if player == "attackers" else "attackers"
 
 
 def best_child(node):
@@ -45,8 +48,35 @@ def expand_node(node):
                 node.children.append(new_node)
 
 
-def simulate(board, player):
-    pass
+def simulate(board, player, visualize=False):
+    """Play through a random game on the given board until termination and return the result."""
+    if visualize:
+        display = graphics.initialize()
+        graphics.refresh(board, display)
+    i = 0
+    while True:
+        # Get a masked action space of legal moves for the player
+        actions = all_legal_moves(board, player)
+        # Get a list of these moves
+        actions = np.argwhere(actions == 1)
+        # Randomly select one
+        choice = random.randint(0, len(actions) - 1)
+        move, row, col = actions[choice]
+        # Make the action
+        new_index = make_move(board, (row, col), move)
+        check_capture(board, tuple(new_index))
+        i += 1
+        if visualize:
+            graphics.refresh(board, display)
+            time.sleep(0.25)
+        # Check for termination
+        terminal = is_terminal(board, player)
+        if terminal:
+            print(terminal)
+            print(f"This simulation took {i} turns.")
+            break
+        else:
+            player = toggle_player(player)
 
 
 class MCTS:

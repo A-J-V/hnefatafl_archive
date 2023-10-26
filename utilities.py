@@ -140,7 +140,7 @@ def all_legal_moves(board: np.array, player: str = 'defenders'):
 def make_move(board_array: np.array,
               index: tuple,
               move: int,
-              ) -> None:
+              ) -> list:
     """Move the piece at index according to move. Assumes the move is legal."""
     # Find which plane the piece is on (which piece type it is)
     plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
@@ -153,6 +153,7 @@ def make_move(board_array: np.array,
     new_index[axis] += direction * num
     board_array[plane, new_index[0], new_index[1]] = 1
     board_array[plane, index[0], index[1]] = 0
+    return new_index
 
 
 def get_nice_variables(board_array: np.array,
