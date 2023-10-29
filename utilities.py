@@ -88,7 +88,7 @@ def get_moves(board: np.array,
     if not board[:, index[0], index[1]].any():
         return np.zeros(40)
     # If the cache of this index is not dirty, immediately return the cached legal moves.
-    if dirty_flags[index[0], index[1]] == 0:
+    if index not in dirty_flags:
         return cache[:, index[0], index[1]]
     size = board.shape[-1] - 1
     restricted = [(0, 0), (0, size), (size, 0), (size, size), (size // 2, size // 2)]
@@ -119,7 +119,7 @@ def get_moves(board: np.array,
     # Update the cache, dirty map, and dirty flags.
     cache[:, index[0], index[1]] = legal_moves
     dirty_map[index] = dirty_indices
-    dirty_flags[index[0], index[1]] = 0
+    dirty_flags.remove(index)
     return cache[:, index[0], index[1]]
 
 
@@ -128,15 +128,13 @@ def update_action_space(board: np.array,
                         dirty_map: dict,
                         dirty_flags: np.array,
                         ) -> None:
-    size = board.shape[-1]
-    for r in range(size):
-        for c in range(size):
-            _ = get_moves(board,
-                          (r, c),
-                          cache,
-                          dirty_map,
-                          dirty_flags,
-                          )
+    for (r, c) in dirty_flags.copy():
+        _ = get_moves(board,
+                      (r, c),
+                      cache,
+                      dirty_map,
+                      dirty_flags,
+                      )
 
 
 def has_moves(board: np.array,
@@ -191,12 +189,12 @@ def make_move(board: np.array,
     board[plane, index[0], index[1]] = 0
 
     # Due to the move, we need to invalidate the cache of old and new location
-    dirty_flags[(index[0], index[1])] = 1
-    dirty_flags[(new_index[0], new_index[1])] = 1
+    dirty_flags.add(index)
+    dirty_flags.add(tuple(new_index))
 
     # Update the cache of the indices affected from the move from old location
     for affected_index in dirty_map[index]:
-        dirty_flags[(affected_index[0], affected_index[1])] = 1
+        dirty_flags.add(affected_index)
 
     # Now update the cache and dirty map at the new location
     _ = get_moves(board,
@@ -206,7 +204,7 @@ def make_move(board: np.array,
                   dirty_flags,
                   )
     for affected_index in dirty_map[tuple(new_index)]:
-        dirty_flags[(affected_index[0], affected_index[1])] = 1
+        dirty_flags.add(affected_index)
 
     return new_index
 
@@ -490,10 +488,10 @@ def is_terminal(board,
                 ):
     king_state = check_king(board)
     if king_state == 1:
-        print("King escaped.")
+        #print("King escaped.")
         return "defenders"
     elif king_state == -1:
-        print("King captured.")
+        #print("King captured.")
         return "attackers"
     elif player == "defenders":
         king_r, king_c = find_king(board)
@@ -502,23 +500,23 @@ def is_terminal(board,
         if (is_edge(king_r, king_c, board.shape[-1] - 1) and
            is_fort(board, (king_r, king_c), defender_tags, interior_tags) and
            is_impenetrable(board, defender_tags, interior_tags)):
-            print("Defenders have built an Exit Fort.")
+            #print("Defenders have built an Exit Fort.")
             return "defenders"
     elif player == "attackers":
         if check_encirclement(board):
             attacker_walls, visited = verify_encirclement(board)
             if is_impenetrable(board, attacker_walls, visited, option='encirclement'):
-                print("Attackers have formed an encirclement.")
+                #print("Attackers have formed an encirclement.")
                 return "attackers"
     # Players already check their legal moves each turn, so this is a redundant (and expensive) operation.
     # Optimize this by just passing in the known number of legal moves. If it's zero, that player loses.
     if defender_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
                                              dirty_flags=dirty_flags, player="defenders"):
-        print("The defenders have no legal moves.")
+        #print("The defenders have no legal moves.")
         return "attackers"
     elif attacker_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
                                                dirty_flags=dirty_flags, player="attackers"):
-        print("The attackers have no legal moves.")
+        #print("The attackers have no legal moves.")
         return "defenders"
 
     # Does not check for draws

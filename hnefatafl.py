@@ -39,7 +39,7 @@ class TaflBoard:
         self.board = np.stack([a_plane, d_plane, k_plane])
         self.shape = self.board.shape[-1]
         # Define a 2D array of dirty flags
-        self.dirty_flags = np.ones((self.shape, self.shape))
+        self.dirty_flags = set(product(list(range(self.shape)), list(range(self.shape))))
         # Define a dictionary mapping index i to a list of indices whose caches are invalidated when i moves
         self.dirty_map = {(row, col): [] for (row, col) in product(list(range(self.shape)), list(range(self.shape)))}
         self.cache = np.zeros(shape=(40, self.shape, self.shape))
