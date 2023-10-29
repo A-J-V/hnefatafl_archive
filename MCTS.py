@@ -73,7 +73,7 @@ def simulate(board,
         move, row, col = actions[choice]
         # Make the action
         new_index = make_move(board, (row, col), move, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
-        check_capture(board, tuple(new_index))
+        check_capture(board, new_index)
         i += 1
         if visualize:
             graphics.refresh(board, display)
@@ -82,7 +82,7 @@ def simulate(board,
         terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player,
                                attacker_moves=attacker_moves, defender_moves=defender_moves)
         if terminal:
-            print(terminal)
+            #print(terminal)
             print(f"This simulation took {i} turns.")
             break
         else:

@@ -173,10 +173,16 @@ def make_move(board: np.array,
               cache: np.array,
               dirty_map: dict,
               dirty_flags: np.array,
-              ) -> list:
+              ) -> tuple:
     """Move the piece at index according to move. Assumes the move is legal."""
     # Find which plane the piece is on (which piece type it is)
-    plane = np.argwhere(board[:, index[0], index[1]] == 1).item()
+    if board[0, index[0], index[1]] == 1:
+        plane = 0
+    elif board[1, index[0], index[1]] == 1:
+        plane = 1
+    else:
+        plane = 2
+
     # Get the move axis, direction, and number of tiles
     axis = 0 if move < 20 else 1
     direction = 1 if move >= 30 or (20 > move >= 10) else -1
@@ -185,12 +191,13 @@ def make_move(board: np.array,
     # Consider changing this from axis, direction to row, col to avoid casting
     new_index = list(index)
     new_index[axis] += direction * num
+    new_index = tuple(new_index)
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 
     # Due to the move, we need to invalidate the cache of old and new location
     dirty_flags.add(index)
-    dirty_flags.add(tuple(new_index))
+    dirty_flags.add(new_index)
 
     # Update the cache of the indices affected from the move from old location
     for affected_index in dirty_map[index]:
@@ -198,12 +205,12 @@ def make_move(board: np.array,
 
     # Now update the cache and dirty map at the new location
     _ = get_moves(board,
-                  tuple(new_index),
+                  new_index,
                   cache,
                   dirty_map,
                   dirty_flags,
                   )
-    for affected_index in dirty_map[tuple(new_index)]:
+    for affected_index in dirty_map[new_index]:
         dirty_flags.add(affected_index)
 
     return new_index
