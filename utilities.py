@@ -484,7 +484,10 @@ def is_terminal(board,
                 cache,
                 dirty_map,
                 dirty_flags,
-                player):
+                player,
+                attacker_moves=1,
+                defender_moves=1,
+                ):
     king_state = check_king(board)
     if king_state == 1:
         print("King escaped.")
@@ -509,10 +512,12 @@ def is_terminal(board,
                 return "attackers"
     # Players already check their legal moves each turn, so this is a redundant (and expensive) operation.
     # Optimize this by just passing in the known number of legal moves. If it's zero, that player loses.
-    if not has_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player="defenders"):
+    if defender_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
+                                             dirty_flags=dirty_flags, player="defenders"):
         print("The defenders have no legal moves.")
         return "attackers"
-    elif not has_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player="attackers"):
+    elif attacker_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
+                                               dirty_flags=dirty_flags, player="attackers"):
         print("The attackers have no legal moves.")
         return "defenders"
 

@@ -20,7 +20,7 @@ if __name__ == "__main__":
     #         'attackers',
     #         visualize=True)
     #print(b.dirty_flags)
-    #cProfile.run("simulate(b.board, b.cache, b.dirty_map, b.dirty_flags, 'attackers', visualize=False)")
+    cProfile.run("simulate(b.board, b.cache, b.dirty_map, b.dirty_flags, 'attackers', visualize=False)")
     #times = []
     #for _ in range(500):
     #    start = time.time()
@@ -46,4 +46,4 @@ if __name__ == "__main__":
     #    make_move(b.board, (row, col), target)
     #    graphics.refresh(b.board, display)
 
-    run_tests()
+    #run_tests()

@@ -55,11 +55,19 @@ def simulate(board,
         display = graphics.initialize()
         graphics.refresh(board, display)
     i = 0
+    # Add a version simple integer cache of how many legal moves each player had last turn
+    attacker_moves = 100
+    defender_moves = 100
     while True:
         # Get a masked action space of legal moves for the player
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player)
         # Get a list of these moves
         actions = np.argwhere(actions == 1)
+        if player == "attackers":
+            attacker_moves = len(actions)
+        else:
+            defender_moves = len(actions)
+
         # Randomly select one
         choice = random.randint(0, len(actions) - 1)
         move, row, col = actions[choice]
@@ -71,7 +79,8 @@ def simulate(board,
             graphics.refresh(board, display)
             time.sleep(0.25)
         # Check for termination
-        terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player)
+        terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player,
+                               attacker_moves=attacker_moves, defender_moves=defender_moves)
         if terminal:
             print(terminal)
             print(f"This simulation took {i} turns.")
