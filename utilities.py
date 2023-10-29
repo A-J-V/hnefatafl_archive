@@ -12,7 +12,7 @@ def is_piece(board, row, col):
 
 
 def is_king(board, row, col):
-    return np.argwhere(board[:, row, col] == 1) == 2
+    return board[2, row, col] == 1
 
 
 def find_king(board):
@@ -20,11 +20,11 @@ def find_king(board):
 
 
 def is_defender(board, row, col):
-    return np.argwhere(board[:, row, col] == 1) == 1
+    return board[1, row, col] == 1
 
 
 def is_attacker(board, row, col):
-    return np.argwhere(board[:, row, col] == 1) == 0
+    return board[0, row, col] == 1
 
 
 def is_edge(row, col, size):
