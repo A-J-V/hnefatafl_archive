@@ -84,15 +84,15 @@ def get_moves(board: np.array,
     """
     # This involves unnecessary casting between lists and tuples and packed and unpacked.
     # It should be cleaned up to try to standardize how the index is to be used through the function (and related funcs)
-    size = board.shape[-1] - 1
-    restricted = [(0, 0), (0, size), (size, 0), (size, size), (size // 2, size // 2)]
-    dirty_indices = []
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
     if not board[:, index[0], index[1]].any():
         return np.zeros(40)
     # If the cache of this index is not dirty, immediately return the cached legal moves.
     if dirty_flags[index[0], index[1]] == 0:
         return cache[:, index[0], index[1]]
+    size = board.shape[-1] - 1
+    restricted = [(0, 0), (0, size), (size, 0), (size, size), (size // 2, size // 2)]
+    dirty_indices = []
     legal_moves = np.zeros(40)
     # Need to go through the 40 possible moves and check the legality of each...
     # 0-9 is up 1-10, 10-19 is down 1-10, 20-29 is left 1-10, 30-39 is right 1-10
@@ -123,22 +123,20 @@ def get_moves(board: np.array,
     return cache[:, index[0], index[1]]
 
 
-def get_action_space(board: np.array,
-                     cache: np.array,
-                     dirty_map: dict,
-                     dirty_flags: np.array,
-                     ) -> np.array:
+def update_action_space(board: np.array,
+                        cache: np.array,
+                        dirty_map: dict,
+                        dirty_flags: np.array,
+                        ) -> None:
     size = board.shape[-1]
-    action_space = np.zeros(shape=(40, size, size))
     for r in range(size):
         for c in range(size):
-            action_space[:, r, c] = get_moves(board,
-                                              (r, c),
-                                              cache,
-                                              dirty_map,
-                                              dirty_flags,
-                                              )
-    return action_space
+            _ = get_moves(board,
+                          (r, c),
+                          cache,
+                          dirty_map,
+                          dirty_flags,
+                          )
 
 
 def has_moves(board: np.array,
@@ -147,12 +145,12 @@ def has_moves(board: np.array,
               dirty_flags,
               player: str = 'defenders'):
     """Check whether a player has any legal moves."""
-    action_space = get_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
+    update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
         mask = board[0, :, :] == 1
     else:
         mask = np.sum(board[1:, :, :], axis=0) == 1
-    return action_space[:, mask].any()
+    return cache[:, mask].any()
 
 
 def all_legal_moves(board: np.array,
@@ -161,11 +159,12 @@ def all_legal_moves(board: np.array,
                     dirty_flags: np.array,
                     player: str = 'defenders'):
     """Return the action-space of all legal moves for a single player"""
-    action_space = get_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
+    update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
         mask = board[0, :, :] != 1
     else:
         mask = np.sum(board[1:, :, :], axis=0) != 1
+    action_space = np.copy(cache)
     action_space[:, mask] = 0
     return action_space
 
@@ -508,7 +507,8 @@ def is_terminal(board,
             if is_impenetrable(board, attacker_walls, visited, option='encirclement'):
                 print("Attackers have formed an encirclement.")
                 return "attackers"
-
+    # Players already check their legal moves each turn, so this is a redundant (and expensive) operation.
+    # Optimize this by just passing in the known number of legal moves. If it's zero, that player loses.
     if not has_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player="defenders"):
         print("The defenders have no legal moves.")
         return "attackers"
