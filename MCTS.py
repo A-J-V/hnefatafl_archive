@@ -44,7 +44,12 @@ def toggle_player(player):
     return "defenders" if player == "attackers" else "attackers"
 
 
-def simulate(board, player, visualize=False):
+def simulate(board,
+             cache,
+             dirty_map,
+             dirty_flags,
+             player,
+             visualize=False):
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
         display = graphics.initialize()
@@ -52,21 +57,21 @@ def simulate(board, player, visualize=False):
     i = 0
     while True:
         # Get a masked action space of legal moves for the player
-        actions = all_legal_moves(board, player)
+        actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player)
         # Get a list of these moves
         actions = np.argwhere(actions == 1)
         # Randomly select one
         choice = random.randint(0, len(actions) - 1)
         move, row, col = actions[choice]
         # Make the action
-        new_index = make_move(board, (row, col), move)
+        new_index = make_move(board, (row, col), move, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
         check_capture(board, tuple(new_index))
         i += 1
         if visualize:
             graphics.refresh(board, display)
             time.sleep(0.25)
         # Check for termination
-        terminal = is_terminal(board, player)
+        terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player)
         if terminal:
             print(terminal)
             print(f"This simulation took {i} turns.")

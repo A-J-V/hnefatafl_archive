@@ -1,6 +1,7 @@
 from copy import deepcopy
 import numpy as np
 from utilities import *
+from itertools import product
 
 # Store the initial map in a string
 starting_board = """\
@@ -36,6 +37,12 @@ class TaflBoard:
         k_plane = np.array([[1 if i == 'K' else 0 for i in list(c)] for c in starting_board.splitlines()])
         # Stack the planes into an array, M x N x N, where N is board length/width and M is number of piece types
         self.board = np.stack([a_plane, d_plane, k_plane])
+        self.shape = self.board.shape[-1]
+        # Define a 2D array of dirty flags
+        self.dirty_flags = np.ones((self.shape, self.shape))
+        # Define a dictionary mapping index i to a list of indices whose caches are invalidated when i moves
+        self.dirty_map = {(row, col): [] for (row, col) in product(list(range(self.shape)), list(range(self.shape)))}
+        self.cache = np.zeros(shape=(40, self.shape, self.shape))
         self.game_over = False
 
     def __repr__(self, board_array: np.array = None) -> str:

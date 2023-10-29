@@ -9,26 +9,26 @@ def run_tests():
     b = TaflBoard(tb['starting_board'])
     assert check_king(b.board) == 0, \
         "Expected no terminal state, as the King has neither escaped nor been captured."
-    assert is_terminal(b.board, "defenders") is None, "Expected no terminal state, but found terminal."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found terminal."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") is None, "Expected no terminal state, but found terminal."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found terminal."
 
     # King is surrounded! This should result in immediate capture.
     b = TaflBoard(tb['instant_loss_surround'])
     assert check_king(b.board) == -1, \
         "Expected instant loss upon checking the King, because the King is surrounded by 4 enemies."
-    assert is_terminal(b.board, "attackers") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "attackers", "Expected a terminal state, but found none."
 
     # King is surrounded! This should result in immediate capture.
     b = TaflBoard(tb['instant_loss_throne'])
     assert check_king(b.board) == -1, \
         "Expected instant loss upon checking the King, because the King is surrounded by 3 enemies + throne."
-    assert is_terminal(b.board, "attackers") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "attackers", "Expected a terminal state, but found none."
 
     # King has escaped to a corner! This should be an immediate defender win.
     b = TaflBoard(tb['instant_win_corner'])
     assert check_king(b.board) == 1, \
         "Expected instant win upon checking the King, because the King is in a corner."
-    assert is_terminal(b.board, "defenders") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "defenders", "Expected a terminal state, but found none."
 
     # A defender is flanked by the empty throne and an attacker. It should be captured upon checking.
     b = TaflBoard(tb['instant_capture_empty_throne_5_7'])
@@ -140,7 +140,7 @@ def run_tests():
         "Expected the King at (10, 5) to be considered in a fort, but it was not."
     assert is_impenetrable(b.board, defender_tags, interior_tags), \
         "Expected the fort around (10, 5) to be impenetrable, but it was deemed penetrable."
-    assert is_terminal(b.board, "defenders") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "defenders", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['exit_fort_0_4'])
     defender_tags = []
@@ -149,7 +149,7 @@ def run_tests():
         "Expected the King at (0, 4) to be considered in a fort, but it was not."
     assert is_impenetrable(b.board, defender_tags, interior_tags), \
         "Expected the fort around (0, 4) to be impenetrable, but it was deemed penetrable."
-    assert is_terminal(b.board, "defenders") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "defenders", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['exit_fort_6_0'])
     defender_tags = []
@@ -158,7 +158,7 @@ def run_tests():
         "Expected the King at (6, 0) to be considered in a fort, but it was not."
     assert is_impenetrable(b.board, defender_tags, interior_tags), \
         "Expected the fort around (6, 0) to be impenetrable, but it was deemed penetrable."
-    assert is_terminal(b.board, "defenders") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "defenders", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['exit_fort_2_0'])
     defender_tags = []
@@ -167,7 +167,7 @@ def run_tests():
         "Expected the King at (2, 0) to be considered in a fort, but it was not."
     assert is_impenetrable(b.board, defender_tags, interior_tags), \
         "Expected the fort around (2, 0) to be impenetrable, but it was deemed penetrable."
-    assert is_terminal(b.board, "defenders") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "defenders", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['encirclement_test_1'])
     assert check_encirclement(b.board), \
@@ -175,7 +175,7 @@ def run_tests():
     attacker_walls, visited = verify_encirclement(b.board)
     assert is_impenetrable(b.board, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to be impenetrable, but it was not."
-    assert is_terminal(b.board, "attackers") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "attackers", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['encirclement_test_2'])
     assert check_encirclement(b.board), \
@@ -183,7 +183,7 @@ def run_tests():
     attacker_walls, visited = verify_encirclement(b.board)
     assert is_impenetrable(b.board, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to be impenetrable, but it was not."
-    assert is_terminal(b.board, "attackers") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "attackers", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['encirclement_test_3'])
     assert check_encirclement(b.board), \
@@ -191,22 +191,22 @@ def run_tests():
     attacker_walls, visited = verify_encirclement(b.board)
     assert is_impenetrable(b.board, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to be impenetrable, but it was not."
-    assert is_terminal(b.board, "attackers") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "attackers", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['no_encirclement_test_1'])
     assert not check_encirclement(b.board), \
         "Expected encirclement to be False, but it was True."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['no_encirclement_test_2'])
     assert not check_encirclement(b.board), \
         "Expected encirclement to be False, but it was True."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['no_encirclement_test_3'])
     assert not check_encirclement(b.board), \
         "Expected encirclement to be False, but it was True."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['partial_encirclement_test_1'])
     assert check_encirclement(b.board), \
@@ -214,7 +214,7 @@ def run_tests():
     attacker_walls, visited = verify_encirclement(b.board)
     assert not is_impenetrable(b.board, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to NOT be impenetrable, but it was."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['partial_encirclement_test_2'])
     assert check_encirclement(b.board), \
@@ -222,7 +222,7 @@ def run_tests():
     attacker_walls, visited = verify_encirclement(b.board)
     assert not is_impenetrable(b.board, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to NOT be impenetrable, but it was."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['partial_encirclement_test_3'])
     assert check_encirclement(b.board), \
@@ -230,84 +230,84 @@ def run_tests():
     attacker_walls, visited = verify_encirclement(b.board)
     assert not is_impenetrable(b.board, attacker_walls, visited, option='encirclement'), \
         "Expected encirclement to NOT be impenetrable, but it was."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['legal_move_check_3_0'])
-    legal_moves = get_moves(b.board, (3, 0))
+    legal_moves = get_moves(b.board, (3, 0), cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags)
     expected_moves = np.array([1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
 
     b = TaflBoard(tb['legal_move_check_3_0_king'])
-    legal_moves = get_moves(b.board, (3, 0))
+    legal_moves = get_moves(b.board, (3, 0), cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags)
     expected_moves = np.array([1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
 
     b = TaflBoard(tb['legal_move_check_5_1'])
-    legal_moves = get_moves(b.board, (5, 1))
+    legal_moves = get_moves(b.board, (5, 1), cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags)
     expected_moves = np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0])
     assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
 
     b = TaflBoard(tb['legal_move_check_5_1_king'])
-    legal_moves = get_moves(b.board, (5, 1))
+    legal_moves = get_moves(b.board, (5, 1), cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags)
     expected_moves = np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0])
     assert np.array_equal(legal_moves, expected_moves), "Expected legal moves did not match the returned legal moves."
 
     b = TaflBoard(tb['defenders_no_moves'])
-    assert not has_moves(b.board, 'defenders'), \
+    assert not has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player='defenders'), \
         "Expected defenders to have no legal moves, but they did."
-    assert is_terminal(b.board, "defenders") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "attackers", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['defenders_no_moves_2'])
-    assert not has_moves(b.board, 'defenders'), \
+    assert not has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have no legal moves, but they did."
-    assert is_terminal(b.board, "defenders") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "attackers", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['defenders_no_moves_3'])
-    assert not has_moves(b.board, 'defenders'), \
+    assert not has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have no legal moves, but they did."
-    assert is_terminal(b.board, "defenders") == "attackers", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="defenders") == "attackers", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['defenders_has_moves'])
-    assert has_moves(b.board, 'defenders'), \
+    assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have legal moves, but they did not."
 
     b = TaflBoard(tb['defenders_has_moves_2'])
-    assert has_moves(b.board, 'defenders'), \
+    assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have legal moves, but they did not."
 
     b = TaflBoard(tb['defenders_has_moves_3'])
-    assert has_moves(b.board, 'defenders'), \
+    assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have legal moves, but they did not."
 
     b = TaflBoard(tb['defenders_has_moves_4'])
-    assert has_moves(b.board, 'defenders'), \
+    assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have legal moves, but they did not."
 
     b = TaflBoard(tb['attackers_no_moves_1'])
-    assert not has_moves(b.board, 'attackers'), \
+    assert not has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'attackers'), \
         "Expected defenders to have no legal moves, but they did."
-    assert is_terminal(b.board, "attackers") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "defenders", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['attackers_no_moves_2'])
-    assert not has_moves(b.board, 'attackers'), \
+    assert not has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'attackers'), \
         "Expected defenders to have no legal moves, but they did."
-    assert is_terminal(b.board, "attackers") == "defenders", "Expected a terminal state, but found none."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") == "defenders", "Expected a terminal state, but found none."
 
     b = TaflBoard(tb['defenders_has_moves_3'])
-    assert has_moves(b.board, 'defenders'), \
+    assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders'), \
         "Expected defenders to have legal moves, but they did not."
-    assert is_terminal(b.board, "attackers") is None, "Expected no terminal state, but found one."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player="attackers") is None, "Expected no terminal state, but found one."
 
     b = TaflBoard(tb['legal_move_test_4_3'])
-    moves = all_legal_moves(b.board, 'defenders')
+    moves = all_legal_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player='defenders')
     assert np.sum(moves) == 4, "Expected exactly four legal moves for the defenders, but found something else."
 
     b = TaflBoard(tb['legal_move_test_10_5'])
-    moves = all_legal_moves(b.board, 'defenders')
+    moves = all_legal_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player= 'defenders')
     assert np.sum(moves) == 17, "Expected exactly 17 legal moves for the defenders, but found something else."
 
     print("All tests finished.")

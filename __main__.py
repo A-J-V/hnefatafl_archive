@@ -13,15 +13,27 @@ from test_boards import test_boards as tb
 
 if __name__ == "__main__":
     b = hnefatafl.TaflBoard()
-    cProfile.run("simulate(b.board, 'attackers', visualize=False)")
-    #simulate(b.board, 'attackers', visualize=True)
+    simulate(b.board,
+             b.cache,
+             b.dirty_map,
+             b.dirty_flags,
+             'attackers',
+             visualize=True)
+    #print(b.dirty_flags)
+    #cProfile.run("simulate(b.board, 'attackers', visualize=False)")
     #times = []
-    #for _ in range(100):
+    #for _ in range(500):
     #    start = time.time()
     #    b = hnefatafl.TaflBoard()
-    #    simulate(b.board, 'attackers', visualize=False)
+    #    simulate(b.board,
+    #             b.cache,
+    #             b.dirty_map,
+    #             b.dirty_flags,
+    #             'attackers',
+    #             visualize=False)
     #    times.append(time.time() - start)
     #print(sum(times) / len(times))
+
     #display = graphics.initialize()
     #graphics.refresh(b.board, display)
     #time.sleep(5)
@@ -34,4 +46,4 @@ if __name__ == "__main__":
     #    make_move(b.board, (row, col), target)
     #    graphics.refresh(b.board, display)
 
-   # run_tests()
+    #run_tests()

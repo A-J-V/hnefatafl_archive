@@ -63,6 +63,9 @@ def is_hostile(board, row, col, ally, hostile):
 
 def get_moves(board: np.array,
               index: tuple,
+              cache: np.array,
+              dirty_map: dict,
+              dirty_flags: np.array,
               ) -> np.array:
     """
     Return a binary array of legal moves.
@@ -74,21 +77,30 @@ def get_moves(board: np.array,
 
     :param np.array board: a 2D NumPy array representing the board
     :param tuple index: a tuple(int, int) representing the index of the piece whose legal moves we're checking.
+    :param np.array cache: a reference to an array of the cached action space
+    :param dict dirty_map: a dict mapping index i to a list of indices whose caches are invalidate if i moves
+    :param np.array dirty_flags: a 2D array of flags indicating whether the move cache of (row, col) is dirty
     :return: A 1D binary NumPy array of length 40 representing legal moves
     """
+    # This involves unnecessary casting between lists and tuples and packed and unpacked.
+    # It should be cleaned up to try to standardize how the index is to be used through the function (and related funcs)
     size = board.shape[-1] - 1
     restricted = [(0, 0), (0, size), (size, 0), (size, size), (size // 2, size // 2)]
-    legal_moves = np.zeros(40)
     dirty_indices = []
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
     if not board[:, index[0], index[1]].any():
-        return legal_moves
+        return np.zeros(40)
+    # If the cache of this index is not dirty, immediately return the cached legal moves.
+    if dirty_flags[index[0], index[1]] == 0:
+        return cache[:, index[0], index[1]]
+    legal_moves = np.zeros(40)
     # Need to go through the 40 possible moves and check the legality of each...
     # 0-9 is up 1-10, 10-19 is down 1-10, 20-29 is left 1-10, 30-39 is right 1-10
     # Two safety checks are necessary to prevent out of bounds errors.
     safe = {-1: lambda x: x > 0, 1: lambda x: x < size}
 
     # Directions are encoded as (row/column, increment/decrement) where row=0, column=1, increment=1, decrement=-1
+    # THIS CAN BE SIMPLIFIED by just using (row, col) instead of axis, direction.
     for k, instruction in enumerate([(0, -1), (0, 1), (1, -1), (1, 1)]):
         axis, direction = instruction
         tmp_index = list(index)
@@ -104,21 +116,38 @@ def get_moves(board: np.array,
                 dirty_indices.append((tmp_index[0], tmp_index[1]))
                 break
             i += 1
-    return legal_moves
+    # Update the cache, dirty map, and dirty flags.
+    cache[:, index[0], index[1]] = legal_moves
+    dirty_map[index] = dirty_indices
+    dirty_flags[index[0], index[1]] = 0
+    return cache[:, index[0], index[1]]
 
 
-def get_action_space(board: np.array) -> np.array:
+def get_action_space(board: np.array,
+                     cache: np.array,
+                     dirty_map: dict,
+                     dirty_flags: np.array,
+                     ) -> np.array:
     size = board.shape[-1]
     action_space = np.zeros(shape=(40, size, size))
     for r in range(size):
         for c in range(size):
-            action_space[:, r, c] = get_moves(board, (r, c))
+            action_space[:, r, c] = get_moves(board,
+                                              (r, c),
+                                              cache,
+                                              dirty_map,
+                                              dirty_flags,
+                                              )
     return action_space
 
 
-def has_moves(board: np.array, player: str = 'defenders'):
+def has_moves(board: np.array,
+              cache,
+              dirty_map,
+              dirty_flags,
+              player: str = 'defenders'):
     """Check whether a player has any legal moves."""
-    action_space = get_action_space(board)
+    action_space = get_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
         mask = board[0, :, :] == 1
     else:
@@ -126,9 +155,13 @@ def has_moves(board: np.array, player: str = 'defenders'):
     return action_space[:, mask].any()
 
 
-def all_legal_moves(board: np.array, player: str = 'defenders'):
+def all_legal_moves(board: np.array,
+                    cache: np.array,
+                    dirty_map: dict,
+                    dirty_flags: np.array,
+                    player: str = 'defenders'):
     """Return the action-space of all legal moves for a single player"""
-    action_space = get_action_space(board)
+    action_space = get_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
         mask = board[0, :, :] != 1
     else:
@@ -137,34 +170,57 @@ def all_legal_moves(board: np.array, player: str = 'defenders'):
     return action_space
 
 
-def make_move(board_array: np.array,
+def make_move(board: np.array,
               index: tuple,
               move: int,
+              cache: np.array,
+              dirty_map: dict,
+              dirty_flags: np.array,
               ) -> list:
     """Move the piece at index according to move. Assumes the move is legal."""
     # Find which plane the piece is on (which piece type it is)
-    plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
+    plane = np.argwhere(board[:, index[0], index[1]] == 1).item()
     # Get the move axis, direction, and number of tiles
     axis = 0 if move < 20 else 1
     direction = 1 if move >= 30 or (20 > move >= 10) else -1
     num = (move % 10) + 1
     # Move the move to the new index and set the old index to 0
+    # Consider changing this from axis, direction to row, col to avoid casting
     new_index = list(index)
     new_index[axis] += direction * num
-    board_array[plane, new_index[0], new_index[1]] = 1
-    board_array[plane, index[0], index[1]] = 0
+    board[plane, new_index[0], new_index[1]] = 1
+    board[plane, index[0], index[1]] = 0
+
+    # Due to the move, we need to invalidate the cache of old and new location
+    dirty_flags[(index[0], index[1])] = 1
+    dirty_flags[(new_index[0], new_index[1])] = 1
+
+    # Update the cache of the indices affected from the move from old location
+    for affected_index in dirty_map[index]:
+        dirty_flags[(affected_index[0], affected_index[1])] = 1
+
+    # Now update the cache and dirty map at the new location
+    _ = get_moves(board,
+                  tuple(new_index),
+                  cache,
+                  dirty_map,
+                  dirty_flags,
+                  )
+    for affected_index in dirty_map[tuple(new_index)]:
+        dirty_flags[(affected_index[0], affected_index[1])] = 1
+
     return new_index
 
 
-def get_nice_variables(board_array: np.array,
+def get_nice_variables(board: np.array,
                        index: tuple,
                        ) -> tuple:
     """Return some convenient variables used in multiple game utilities"""
     row, col = index
     teams = {0: 1, 1: 2, 2: 2}
-    size = board_array.shape[-1] - 1
+    size = board.shape[-1] - 1
     hostile = [(0, 0), (0, size), (size, 0), (size, size)]
-    plane = np.argwhere(board_array[:, index[0], index[1]] == 1).item()
+    plane = np.argwhere(board[:, index[0], index[1]] == 1).item()
     ally = teams[plane]
     return row, col, teams, size, hostile, plane, ally
 
@@ -425,7 +481,11 @@ def check_king(board_array: np.array,
     return 0
 
 
-def is_terminal(board, player):
+def is_terminal(board,
+                cache,
+                dirty_map,
+                dirty_flags,
+                player):
     king_state = check_king(board)
     if king_state == 1:
         print("King escaped.")
@@ -449,10 +509,10 @@ def is_terminal(board, player):
                 print("Attackers have formed an encirclement.")
                 return "attackers"
 
-    if not has_moves(board, "defenders"):
+    if not has_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player="defenders"):
         print("The defenders have no legal moves.")
         return "attackers"
-    elif not has_moves(board, "attackers"):
+    elif not has_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player="attackers"):
         print("The attackers have no legal moves.")
         return "defenders"
 
