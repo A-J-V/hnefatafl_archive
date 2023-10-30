@@ -8,7 +8,9 @@ TEAMS = {0: 1, 1: 2, 2: 2}
 # Several small convenience functions that are used in multiple places for condition checks
 def is_piece(board, row, col):
     # This could cause an index out of bounds error!
-    return board[:, row, col].any()
+    return ((board[0, row, col] == 1) or
+            (board[1, row, col] == 1) or
+            (board[2, row, col] == 1))
 
 
 def is_king(board, row, col):
@@ -85,19 +87,18 @@ def get_moves(board: np.array,
     # This involves unnecessary casting between lists and tuples and packed and unpacked.
     # It should be cleaned up to try to standardize how the index is to be used through the function (and related funcs)
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
-    if not board[:, index[0], index[1]].any():
+    if not is_piece(board, index[0], index[1]):
         return np.zeros(40)
     # If the cache of this index is not dirty, immediately return the cached legal moves.
-    if index not in dirty_flags:
+    elif index not in dirty_flags:
         return cache[:, index[0], index[1]]
     size = board.shape[-1] - 1
-    restricted = [(0, 0), (0, size), (size, 0), (size, size), (size // 2, size // 2)]
+    restricted = [[0, 0], [0, size], [size, 0], [size, size], [size // 2, size // 2]]
     dirty_indices = []
     legal_moves = np.zeros(40)
     # Need to go through the 40 possible moves and check the legality of each...
     # 0-9 is up 1-10, 10-19 is down 1-10, 20-29 is left 1-10, 30-39 is right 1-10
     # Two safety checks are necessary to prevent out of bounds errors.
-    safe = {-1: lambda x: x > 0, 1: lambda x: x < size}
 
     # Directions are encoded as (row/column, increment/decrement) where row=0, column=1, increment=1, decrement=-1
     # THIS CAN BE SIMPLIFIED by just using (row, col) instead of axis, direction.
@@ -105,13 +106,15 @@ def get_moves(board: np.array,
         axis, direction = instruction
         tmp_index = list(index)
         i = k * 10
-        while i < (k + 1) * 10 and safe[direction](tmp_index[axis]):
+        while i < (k + 1) * 10:
             tmp_index[axis] += direction
-            if not board[:, tmp_index[0], tmp_index[1]].any():
+            if not in_bounds(tmp_index[0], tmp_index[1], size):
+                break
+            if not is_piece(board, tmp_index[0], tmp_index[1]):
                 # No blocking piece
-                if tuple(tmp_index) not in restricted or is_king(board, index[0], index[1]):
+                if tmp_index not in restricted or is_king(board, index[0], index[1]):
                     legal_moves[i] = 1
-            elif board[:, tmp_index[0], tmp_index[1]].any():
+            else:
                 # Blocking piece
                 dirty_indices.append((tmp_index[0], tmp_index[1]))
                 break
