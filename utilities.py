@@ -43,7 +43,7 @@ def in_bounds(row, col, size):
 
 def is_blank(board, row, col):
     size = board.shape[-1] - 1
-    return in_bounds(row, col, size) and not board[:, row, col].any()
+    return in_bounds(row, col, size) and not is_piece(board, row, col)
 
 
 def near_blank(board_array, row, col):
@@ -165,7 +165,7 @@ def all_legal_moves(board: np.array,
         mask = board[0, :, :] != 1
     else:
         mask = np.sum(board[1:, :, :], axis=0) != 1
-    action_space = np.copy(cache)
+    action_space = np.array(cache)
     action_space[:, mask] = 0
     return action_space
 
@@ -224,12 +224,11 @@ def get_nice_variables(board: np.array,
                        ) -> tuple:
     """Return some convenient variables used in multiple game utilities"""
     row, col = index
-    teams = {0: 1, 1: 2, 2: 2}
     size = board.shape[-1] - 1
     hostile = [(0, 0), (0, size), (size, 0), (size, size)]
     plane = np.argwhere(board[:, index[0], index[1]] == 1).item()
-    ally = teams[plane]
-    return row, col, teams, size, hostile, plane, ally
+    ally = TEAMS[plane]
+    return row, col, TEAMS, size, hostile, plane, ally
 
 
 def check_capture(board: np.array,
@@ -369,12 +368,12 @@ def is_fort(board, index, defender_tags, interior_tags):
 def verify_encirclement(board):
     size = board.shape[-1] - 1
     queue = deque()
-    visited = []
+    visited = set()
     attacker_walls = []
     interior_tiles = []
     start_row, start_col = find_king(board)
     queue.append((start_row, start_col))
-    visited.append((start_row, start_col))
+    visited.add((start_row, start_col))
     interior_tiles.append((start_row, start_col))
 
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
@@ -384,7 +383,7 @@ def verify_encirclement(board):
         for dr, dc in directions:
             nr, nc = row + dr, col + dc
             if in_bounds(nr, nc, size) and (nr, nc) not in visited:
-                visited.append((nr, nc))
+                visited.add((nr, nc))
                 if is_defender(board, nr, nc) or is_blank(board, nr, nc):
                     interior_tiles.append((nr, nc))
                     queue.append((nr, nc))
@@ -428,17 +427,17 @@ def is_impenetrable(board, wall_tags, interior_tags, option='fort'):
 def check_encirclement(board):
     size = board.shape[-1] - 1
     queue = deque()
-    visited = []
+    visited = set()
 
     for i in range(size + 1):
         queue.append((i, 0))
         queue.append((0, i))
         queue.append((i, size))
         queue.append((size, i))
-        visited.append((i, 0))
-        visited.append((0, i))
-        visited.append((i, size))
-        visited.append((size, i))
+        visited.add((i, 0))
+        visited.add((0, i))
+        visited.add((i, size))
+        visited.add((size, i))
 
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
@@ -450,7 +449,7 @@ def check_encirclement(board):
             nr, nc = row + dr, col + dc
 
             if in_bounds(nr, nc, size) and (nr, nc) not in visited:
-                visited.append((nr, nc))
+                visited.add((nr, nc))
                 if is_defender(board, nr, nc) or is_king(board, nr, nc):
                     return False
                 elif is_blank(board, nr, nc):
