@@ -1,4 +1,5 @@
 from collections import deque
+import cython
 import numpy as np
 cimport numpy as np
 from typing import List, Tuple
@@ -65,6 +66,7 @@ def is_hostile(board, row, col, ally, hostile):
 # The group of small convenience functions ends here
 
 
+
 cpdef get_moves(board: np.array,
                 index: Tuple[int, int],
                 cache: np.array,
@@ -95,7 +97,7 @@ cpdef get_moves(board: np.array,
     elif index not in dirty_flags:
         return cache[:, index[0], index[1]]
     cdef int size
-    size = board.shape[-1] - 1
+    size = board.shape[2] - 1
     restricted = [[0, 0], [0, size], [size, 0], [size, size], [size // 2, size // 2]]
     dirty_indices = []
     legal_moves = np.zeros(40)
@@ -111,16 +113,21 @@ cpdef get_moves(board: np.array,
     dx[0], dx[1], dx[2], dx[3] = 0, 0, 1, 1
     cdef int dy[4]
     dy[0], dy[1], dy[2], dy[3] = -1, 1, -1, 1
-    cdef int index_row = index[0]
-    cdef int index_col = index[1]
+    cdef int initial_row
+    cdef int initial_col
+    initial_row = index[0]
+    initial_col = index[1]
+    cdef int tmp_index[2]
+
     for k in range(4):
         axis = dx[k]
         direction = dy[k]
-        tmp_index = list(index)
+        tmp_index[0] = initial_row
+        tmp_index[1] = initial_col
         i = k * 10
         while i < (k + 1) * 10:
-            tmp_index[axis] += direction
-            if not in_bounds(tmp_index[0], tmp_index[1], size):
+            tmp_index[axis] = tmp_index[axis] + direction
+            if (tmp_index[0] < 0) or (tmp_index[0] > size) or (tmp_index[1] < 0) or (tmp_index[1] > size):
                 break
             if not is_piece(board, tmp_index[0], tmp_index[1]):
                 # No blocking piece
