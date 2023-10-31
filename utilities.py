@@ -8,7 +8,7 @@ from typing import List, Tuple
 TEAMS = {0: 1, 1: 2, 2: 2}
 # This global variable is set with set_global_piece_flags during the initialization of the game.
 # It is read by is_piece and can be written to by make_move(), check_capture(), and capture_tags().
-PIECE_FLAGS = None
+PIECE_FLAGS = np.array([])
 
 
 def set_global_piece_flags(piece_flags: np.array) -> None:
@@ -275,11 +275,11 @@ def quiescent_attacker(board: np.array) -> bool:
 
 
 def get_moves(board: np.array,
-                index: Tuple[int, int],
-                cache: np.array,
-                dirty_map: dict,
-                dirty_flags: np.array,
-                ):
+              index: Tuple[int, int],
+              cache: np.array,
+              dirty_map: dict,
+              dirty_flags: set,
+              ) -> np.array:
     """
     Return a binary array of legal moves.
 
@@ -295,11 +295,11 @@ def get_moves(board: np.array,
     :param np.array dirty_flags: a 2D array of flags indicating whether the move cache of (row, col) is dirty
     :return: A 1D binary NumPy array of length 40 representing legal moves
     """
-    # This involves unnecessary casting between lists and tuples and packed and unpacked.
-    # It should be cleaned up to try to standardize how the index is to be used through the function (and related funcs)
+
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
     if not is_piece(index[0], index[1]):
         return np.zeros(40)
+
     # If the cache of this index is not dirty, immediately return the cached legal moves.
     elif index not in dirty_flags:
         return cache[:, index[0], index[1]]
@@ -358,8 +358,21 @@ def get_moves(board: np.array,
 def update_action_space(board: np.array,
                         cache: np.array,
                         dirty_map: dict,
-                        dirty_flags: np.array,
-                        ):
+                        dirty_flags: set,
+                        ) -> None:
+    """
+    Refresh any dirty cache locations.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param np.array cache: The 3D NumPy array cache of moves.
+    :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
+                      if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
+    :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :return: None
+    """
+
+    # This loop will modify the dirty_flags set since it's refreshing the cache.
+    # We need a copy of the set to avoid iterating over a structure that we're modifying.
     for (r, c) in dirty_flags.copy():
         _ = get_moves(board,
                       (r, c),
@@ -370,11 +383,27 @@ def update_action_space(board: np.array,
 
 
 def has_moves(board: np.array,
-              cache,
-              dirty_map,
-              dirty_flags,
-              player: str = 'defenders'):
-    """Check whether a player has any legal moves."""
+              cache: np.array,
+              dirty_map: dict,
+              dirty_flags: set,
+              player: str = 'defenders',
+              ) -> bool:
+    """
+    Check whether a player has any legal moves.
+
+    This should only be called if we know that a player has so few moves that
+    their opponent may have eliminated their last legal move in the last turn. The program already passively already
+    tracks the number of legal moves that a player has, so this function is basically a way to explicitly confirm
+    that a player has no moves prior to terminating the game.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param np.array cache: The 3D NumPy array cache of moves.
+    :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
+                      if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
+    :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :param str player: The player. It is either "attackers" or "defenders".
+    :return: True if player has remaining moves, False if player has no legal moves.
+    """
     update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
         mask = board[0, :, :] == 1
@@ -384,11 +413,22 @@ def has_moves(board: np.array,
 
 
 def all_legal_moves(board: np.array,
-                      cache: np.array,
-                      dirty_map: dict,
-                      dirty_flags: np.array,
-                      player: str = 'defenders'):
-    """Return the action-space of all legal moves for a single player"""
+                    cache: np.array,
+                    dirty_map: dict,
+                    dirty_flags: set,
+                    player: str = 'defenders',
+                    ) -> np.array:
+    """
+    Return a 3D NumPy array representing the action-space of a single player.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param np.array cache: The 3D NumPy array cache of moves.
+    :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
+                      if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
+    :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :param str player: The player. It is either "attackers" or "defenders".
+    :return: A 3D NumPy array representing the action-space of a single player. For standard hnefatafl, it is 40x11x11.
+    """
     update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
         mask = board[0, :, :] != 1
@@ -401,14 +441,25 @@ def all_legal_moves(board: np.array,
 
 def make_move(board: np.array,
               index: Tuple[int, int],
-              move: np.int64,
+              move: int,
               cache: np.array,
               dirty_map: dict,
-              dirty_flags: np.array,
+              dirty_flags: set,
               ) -> tuple:
-    """Move the piece at index according to move. Assumes the move is legal."""
+    """
+    Move the piece at index according to move. Assumes the move is legal.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param Tuple[int, int] index: The index of the piece to be moved.
+    :param int move: The encoded move that the piece at index will make.
+    :param np.array cache: The 3D NumPy array cache of moves.
+    :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
+                      if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
+    :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :return:
+    """
+
     # Find which plane the piece is on (which piece type it is)
-    #cdef int plane
     if board[0, index[0], index[1]] == 1:
         plane = 0
     elif board[1, index[0], index[1]] == 1:
@@ -420,15 +471,15 @@ def make_move(board: np.array,
     axis = 0 if move < 20 else 1
     direction = 1 if move >= 30 or (20 > move >= 10) else -1
     num = (move % 10) + 1
-    # Move the move to the new index and set the old index to 0
-    # Consider changing this from axis, direction to row, col to avoid casting
+
+    # Move the piece to the new index and set the old index to 0
     new_index = list(index)
     new_index[axis] += direction * num
     new_index = tuple(new_index)
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 
-    # Update piece_flags
+    # Update PIECE_FLAGS. This is writing to a global variable.
     PIECE_FLAGS[index[0], index[1]] = 0
     PIECE_FLAGS[new_index[0], new_index[1]] = 1
 
@@ -436,17 +487,21 @@ def make_move(board: np.array,
     dirty_flags.add(index)
     dirty_flags.add(new_index)
 
-    # Update the cache of the indices affected from the move from old location
+    # Update the cache of the indices affected by the move from the old location
     for affected_index in dirty_map[index]:
         dirty_flags.add(affected_index)
 
     # Now update the cache and dirty map at the new location
+    # Note that the reason we're doing this here is that we refresh the dirty_map as a byproduct of
+    # get_moves(), and we need that to be able to set the dirty flags at the new location.
     _ = get_moves(board,
                   new_index,
                   cache,
                   dirty_map,
                   dirty_flags,
                   )
+
+    # Update the cache of the indices affected by the move to the new location
     for affected_index in dirty_map[new_index]:
         dirty_flags.add(affected_index)
 
