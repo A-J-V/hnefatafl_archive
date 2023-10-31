@@ -63,6 +63,21 @@ def is_hostile(board, row, col, ally, hostile):
             (row, col) in hostile)
 
 
+def quiescent_defender(board, cache, dirty_map, dirty_flags, ):
+    row, col = find_king(board)
+    size = board.shape[2] - 1
+    king_moves = get_moves(board=board, index=(row, col), cache=cache,
+                           dirty_map=dirty_map, dirty_flags=dirty_flags)
+    if col == 0 or col == size:
+        if king_moves[row - 1] == 1 or king_moves[9 + (size - row)]:
+            return True
+    elif row == 0 or row == size:
+        if king_moves[19 + col] == 1 or king_moves[29 + (size - col)] == 1:
+            return True
+    else:
+        return False
+
+
 # The group of small convenience functions ends here
 
 
