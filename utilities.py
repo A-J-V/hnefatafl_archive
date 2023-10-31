@@ -4,79 +4,213 @@ import numpy as np
 # cimport numpy as np
 from typing import List, Tuple
 
-# This is a global constant that maps piece planes to team
+# This is a global constant that maps piece planes to team. It is game specific.
 TEAMS = {0: 1, 1: 2, 2: 2}
+# This global variable is set with set_global_piece_flags during the initialization of the game.
+# It is read by is_piece and can be written to by make_move(), check_capture(), and capture_tags().
 PIECE_FLAGS = None
 
 
-def set_global_piece_flags(piece_flags):
+def set_global_piece_flags(piece_flags: np.array) -> None:
+    """
+    Set the global variable PIECE_FLAGS.
+    This should only be called once at the start of the game!
+
+    :param np.array piece_flags: A 2D binary array where 1 means a piece is present at (i, j), 0 means not present.
+    """
     global PIECE_FLAGS
     PIECE_FLAGS = piece_flags
 
 
 # Several small convenience functions that are used in multiple places for condition checks
-def is_piece(row: np.int64, col: np.int64):
+def is_piece(row: int, col: int) -> int:
+    """
+    Return 1 if a piece is located at (row, col), 0 otherwise.
+
+    :param int row: The row index.
+    :param int col: The col index.
+    :return: 1 if there is a piece at (row, col), 0 otherwise.
+    """
     # This could cause an index out of bounds error!
     return PIECE_FLAGS[row, col]
 
 
-def is_king(board: np.array, row: np.int64, col: np.int64):
+def is_king(board: np.array, row: int, col: int) -> bool:
+    """
+    Return True if the King is located at (row, col), False otherwise.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row: The row index.
+    :param int col: The col index.
+    :return: True if the King is at (row, col), False otherwise
+    """
     return board[2, row, col] == 1
 
 
-def find_king(board: np.array):
+def find_king(board: np.array) -> Tuple[int, int]:
+    """
+    Returns the current location of the King.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :return: The (row, col) tuple location of the King.
+    """
     return tuple(np.argwhere(board[2, :, :] == 1)[0])
 
 
-def is_defender(board: np.array, row: np.int64, col: np.int64):
+def is_defender(board: np.array, row: int, col: int) -> bool:
+    """
+    Return True if a defender is located at (row, col), False otherwise.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row: The row index.
+    :param int col: The col index.
+    :return: True if a defender is at (row, col), False otherwise
+    """
     return board[1, row, col] == 1
 
 
-def is_attacker(board: np.array, row: np.int64, col: np.int64):
+def is_attacker(board: np.array, row: int, col: int) -> bool:
+    """
+    Return True if an attacker is located at (row, col), False otherwise.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row: The row index.
+    :param int col: The col index.
+    :return: True if an attacker is at (row, col), False otherwise
+    """
     return board[0, row, col] == 1
 
 
-def is_edge(row, col, size):
+def is_edge(row: int, col: int, size: int) -> bool:
+    """
+    Return True if (row, col) is on the edge of the board, False otherwise.
+
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :return: True if (row, col) is on the edge of the board, False otherwise
+    """
     return row == 0 or col == 0 or row == size or col == size
 
 
-def is_corner(row, col, size):
+def is_corner(row: int, col: int, size: int) -> bool:
+    """
+    Return True if (row, col) is a corner, False otherwise.
+
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :return: True if (row, col) is a corner of the board, False otherwise
+    """
     return (row, col) == (0, 0) or (row, col) == (0, size) or (row, col) == (size, 0) or (row, col) == (size, size)
 
 
-def in_bounds(row, col, size):
+def in_bounds(row: int, col: int, size: int) -> bool:
+    """
+    Return True if (row, col) is a legal index, False otherwise.
+
+    This is used extensively to short-circuit chained conditional statements and
+    break out of loops if the board end is reached.
+
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :return: True if (row, col) is on the board (a legal index), False otherwise
+    """
     return 0 <= row <= size and 0 <= col <= size
 
 
-def is_blank(board, row, col):
-    size = board.shape[-1] - 1
+def is_blank(row: int, col: int, size: int) -> bool:
+    """
+    Return True if NO piece is located at (row, col), False otherwise.
+
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :return: True if there is NO piece at (row, col), False otherwise.
+    """
     return in_bounds(row, col, size) and not is_piece(row, col)
 
 
-def near_blank(board_array, row, col):
-    return (is_blank(board_array, row - 1, col) or is_blank(board_array, row + 1, col) or
-            is_blank(board_array, row, col - 1) or is_blank(board_array, row, col + 1))
+def near_blank(row: int, col: int, size: int) -> bool:
+    """
+    Return True if at least one tile adjacent to (row, col) is blank, False otherwise.
+
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :return:
+    """
+    return (is_blank(row - 1, col, size) or is_blank(row + 1, col, size) or
+            is_blank(row, col - 1, size) or is_blank(row, col + 1, size))
 
 
-def is_ally(board_array, row, column, ally):
-    return is_piece(row, column) and TEAMS[np.argwhere(board_array[:, row, column] == 1).item()] == ally
+def is_ally(board: np.array, row: int, col: int, ally: int) -> bool:
+    """
+    Returns True if a piece at (row, col) is the same team as the arg ally.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int ally: The team being checked against.
+    :return: True if a piece at (row, col) is on the team of the arg "ally".
+    """
+    return is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally
 
 
-def is_hostile(board, row, col, ally, hostile):
+def is_hostile(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,]) -> bool:
+    """
+    Returns True if (row, col) is hostile to the "ally" team.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row:  The row index.
+    :param int col:  The col index.
+    :param int ally:  The team being checked against.
+    :param list hostile: A list of hostile tiles, such as corners or (sometimes) the throne.
+    :return: True if (row, col) is hostile to the "ally" team, False otherwise.
+    """
     return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] != ally) or
             (row, col) in hostile)
 
 
-def is_flanked(board, row, col, ally, hostile):
+def is_flanked(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,]) -> bool:
+    """
+    Returns True if (row, col) is flanked by hostile tiles.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row:  The row index.
+    :param int col:  The col index.
+    :param int ally:  The team being checked against.
+    :param list hostile: A list of hostile tiles, such as corners or (sometimes) the throne.
+    :return: True if (row, col) flanked by hostile tiles, False otherwise.
+    """
     return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
             ((row, col) in hostile))
 
 
-def quiescent_defender(board, cache, dirty_map, dirty_flags):
+def quiescent_defender(board: np.array, cache: np.array, dirty_map: dict, dirty_flags: set) -> bool:
+    """
+    Returns True if the Defenders have imminent victory (they can win if they move right now), False otherwise.
+
+    This function is designed as a minimalist heuristic to guide MCTS rollouts by keeping the rollouts close to random,
+    but deterministically terminating them if a state is reached in which a real game would surely end.
+    These semi-random rollouts typically take 50% - 70% fewer turns than a genuinely random rollout would.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param np.array cache: The 3D NumPy array cache of moves.
+    :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
+                      if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
+    :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :return: True if the Defenders can immediately win by the King escaping, False otherwise.
+    """
     row, col = find_king(board)
     size = board.shape[2] - 1
     king_moves = get_moves(board=board, index=(row, col), cache=cache,
                            dirty_map=dirty_map, dirty_flags=dirty_flags)
+
+    # If the King is on any edge, then there are exactly two moves that he may have that would end the game.
+    # Depending on which edge he is on and where, we check those two moves. If at least one is legal,
+    # the Defenders have imminent victory. Return True.
     if col == 0 or col == size:
         if king_moves[row - 1] == 1 or king_moves[9 + (size - row)]:
             return True
@@ -87,11 +221,23 @@ def quiescent_defender(board, cache, dirty_map, dirty_flags):
         return False
 
 
-def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
+def quiescent_attacker(board: np.array) -> bool:
+    """
+    Returns True if the Attackers have imminent victory (they can win if they move right now), False otherwise.
+
+    This function is designed as a minimalist heuristic to guide MCTS rollouts by keeping the rollouts close to random,
+    but deterministically terminating them if a state is reached in which a real game would surely end.
+    These semi-random rollouts typically take 50% - 70% fewer turns than a genuinely random rollout would.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :return: True if the Attackers can immediately win by capturing the King, False otherwise.
+    """
     row, col = find_king(board)
     num_surrounding = 0
     size = board.shape[2] - 1
     sides = {(row + 1, col), (row - 1, col), (row, col + 1), (row, col - 1)}
+
+    # Check the four tiles adjacent to the King, who is at (row, col)
     if in_bounds(row + 1, col, size) and (is_attacker(board, row + 1, col) or (row + 1, col) == (size//2, size/2)):
         num_surrounding += 1
         sides.remove((row + 1, col))
@@ -104,11 +250,15 @@ def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
     if in_bounds(row, col - 1, size) and (is_attacker(board, row, col - 1) or (row, col - 1) == (size//2, size/2)):
         num_surrounding += 1
         sides.remove((row, col - 1))
+
+    # If the King already has three hostile tiles around him, examine the fourth blank tile.
     if num_surrounding == 3:
         open_space = sides.pop()
-        if is_blank(board, open_space[0], open_space[1]):
+        if is_blank(open_space[0], open_space[1], size):
             for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 tr, tc = open_space
+                # If we can walk from the blank tile in any direction and bump an attacker, that attacker could
+                # capture the King. Therefore, the Attackers have imminent victory, return True.
                 while True:
                     tr += dr
                     tc += dc
@@ -440,7 +590,7 @@ def is_fort(board, index, defender_tags, interior_tags):
     for step in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
         if not in_bounds(row + step[0], col + step[1], size):
             continue
-        elif is_blank(board, row + step[0], col + step[1]) or is_king(board, row + step[0], col + step[1]):
+        elif is_blank(row + step[0], col + step[1], size) or is_king(board, row + step[0], col + step[1]):
             if (row + step[0], col + step[1]) not in interior_tags:
                 adjacent_interior.append((row + step[0], col + step[1]))
         elif is_defender(board, row + step[0], col + step[1]):
@@ -474,7 +624,7 @@ def verify_encirclement(board):
             nr, nc = row + dr, col + dc
             if in_bounds(nr, nc, size) and (nr, nc) not in visited:
                 visited.add((nr, nc))
-                if is_defender(board, nr, nc) or is_blank(board, nr, nc):
+                if is_defender(board, nr, nc) or is_blank(nr, nc, size):
                     interior_tiles.append((nr, nc))
                     queue.append((nr, nc))
                 elif is_attacker(board, nr, nc):
@@ -542,7 +692,7 @@ def check_encirclement(board):
                 visited.add((nr, nc))
                 if is_defender(board, nr, nc) or is_king(board, nr, nc):
                     return False
-                elif is_blank(board, nr, nc):
+                elif is_blank(nr, nc, size):
                     queue.append((nr, nc))
 
     return True
