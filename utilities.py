@@ -1,7 +1,7 @@
 from collections import deque
 import cython
 import numpy as np
-#cimport numpy as np
+# cimport numpy as np
 from typing import List, Tuple
 
 # This is a global constant that maps piece planes to team
@@ -301,8 +301,13 @@ def get_nice_variables(board: np.array,
     """Return some convenient variables used in multiple game utilities"""
     row, col = index
     size = board.shape[-1] - 1
-    hostile = [(0, 0), (0, size), (size, 0), (size, size)]
-    plane = np.argwhere(board[:, index[0], index[1]] == 1).item()
+    hostile = {(0, 0), (0, size), (size, 0), (size, size)}
+    if board[0, index[0], index[1]] == 1:
+        plane = 0
+    elif board[1, index[0], index[1]] == 1:
+        plane = 1
+    else:
+        plane = 2
     ally = TEAMS[plane]
     return row, col, TEAMS, size, hostile, plane, ally
 
@@ -316,7 +321,7 @@ def check_capture(board: np.array,
 
     # If the throne is empty, it is hostile
     if not board[:, size // 2, size // 2].any():
-        hostile.append((size // 2, size // 2))
+        hostile.add((size // 2, size // 2))
 
     # Set up some convenient anonymous functions to check conditions
     is_enemy = lambda r, c: (is_piece(board, r, c) and
@@ -542,7 +547,7 @@ def check_king(board_array: np.array,
     size = board_array.shape[-1] - 1
     row, col = tuple(np.argwhere(board_array[2, :, :] == 1)[0])
     corners = [(0, 0), (0, size), (size, 0), (size, size)]
-    throne = (size / 2, size / 2)
+    throne = (size // 2, size // 2)
     is_hostile = lambda row, col: (row, col) == throne or (
             board_array[:, row, col].any() and TEAMS[np.argwhere(board_array[:, row, col] == 1).item()] != 2)
 
