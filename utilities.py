@@ -1,5 +1,5 @@
 from collections import deque
-import cython
+# import cython
 import numpy as np
 # cimport numpy as np
 from typing import List, Tuple
@@ -158,6 +158,19 @@ def is_ally(board: np.array, row: int, col: int, ally: int) -> bool:
     return is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally
 
 
+def is_enemy(board: np.array, row: int, col: int, plane: int) -> bool:
+    """
+    Return True if the piece at (row, col) is a non-King enemy according plane.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param int row: The row index.
+    :param int col: The col index.
+    :param int plane: The piece plane. is_enemy checks for non-King "enemies" from the perspective of this plane.
+    :return: True if the (row, col) contains a non-King enemy, False otherwise.
+    """
+    return is_piece(row, col) and np.argwhere(board[:, row, col] == 1).item() not in [plane, 2]
+
+
 def is_hostile(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,]) -> bool:
     """
     Returns True if (row, col) is hostile to the "ally" team.
@@ -186,6 +199,29 @@ def is_flanked(board: np.array, row: int, col: int, ally: int, hostile: List[tup
     """
     return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
             ((row, col) in hostile))
+
+
+def get_nice_variables(board: np.array,
+                       index: tuple,
+                       ) -> tuple:
+    """
+    Return some convenient variables used in multiple game utilities
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.e
+    :param Tuple[int, int] index: The index of the relevant piece that we're interested in.
+    :return: A tuple containing several variables of use.
+    """
+    row, col = index
+    size = board.shape[-1] - 1
+    hostile = {(0, 0), (0, size), (size, 0), (size, size)}
+    if board[0, index[0], index[1]] == 1:
+        plane = 0
+    elif board[1, index[0], index[1]] == 1:
+        plane = 1
+    else:
+        plane = 2
+    ally = TEAMS[plane]
+    return row, col, TEAMS, size, hostile, plane, ally
 
 
 def quiescent_defender(board: np.array, cache: np.array, dirty_map: dict, dirty_flags: set) -> bool:
@@ -508,27 +544,16 @@ def make_move(board: np.array,
     return new_index
 
 
-def get_nice_variables(board: np.array,
-                       index: tuple,
-                       ) -> tuple:
-    """Return some convenient variables used in multiple game utilities"""
-    row, col = index
-    size = board.shape[-1] - 1
-    hostile = {(0, 0), (0, size), (size, 0), (size, size)}
-    if board[0, index[0], index[1]] == 1:
-        plane = 0
-    elif board[1, index[0], index[1]] == 1:
-        plane = 1
-    else:
-        plane = 2
-    ally = TEAMS[plane]
-    return row, col, TEAMS, size, hostile, plane, ally
-
-
 def check_capture(board: np.array,
                   index: tuple,
                   ) -> None:
-    """Given an index, checks to see if any basic enemies pieces around it are captured."""
+    """
+    Given an index, checks to see if any basic enemies pieces around it are captured.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
+    :return: None; if a piece can be captured, it will be automatically within this function.
+    """
     # Set up some convenient variables
     row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
 
@@ -536,12 +561,8 @@ def check_capture(board: np.array,
     if not board[:, size // 2, size // 2].any():
         hostile.add((size // 2, size // 2))
 
-    # Set up some convenient anonymous functions to check conditions
-    is_enemy = lambda r, c: (is_piece(r, c) and
-                             np.argwhere(board[:, r, c] == 1).item() not in [plane, 2])
-
     # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
-    if row > 0 and is_enemy(row - 1, col):
+    if row > 0 and is_enemy(board, row - 1, col, plane):
         if is_edge(row - 1, col, size):
             tags = []
             if check_shield_wall(board, (row - 1, col), tags):
@@ -552,7 +573,7 @@ def check_capture(board: np.array,
             board[:, row - 1, col] = 0
             PIECE_FLAGS[row - 1, col] = 0
 
-    if row < size and is_enemy(row + 1, col):
+    if row < size and is_enemy(board, row + 1, col, plane):
         if is_edge(row + 1, col, size):
             tags = []
             if check_shield_wall(board, (row + 1, col), tags):
@@ -561,7 +582,7 @@ def check_capture(board: np.array,
             board[:, row + 1, col] = 0
             PIECE_FLAGS[row + 1, col] = 0
 
-    if col > 0 and is_enemy(row, col - 1):
+    if col > 0 and is_enemy(board, row, col - 1, plane):
         if is_edge(row, col - 1, size):
             tags = []
             if check_shield_wall(board, (row, col - 1), tags):
@@ -570,7 +591,7 @@ def check_capture(board: np.array,
             board[:, row, col - 1] = 0
             PIECE_FLAGS[row, col - 1] = 0
 
-    if col < size and is_enemy(row, col + 1):
+    if col < size and is_enemy(board, row, col + 1, plane):
         if is_edge(row, col + 1, size):
             tags = []
             if check_shield_wall(board, (row, col + 1), tags):
