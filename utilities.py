@@ -63,6 +63,11 @@ def is_hostile(board, row, col, ally, hostile):
             (row, col) in hostile)
 
 
+def is_flanked(board, row, col, ally, hostile):
+    return ((is_piece(board, row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
+            ((row, col) in hostile))
+
+
 def quiescent_defender(board, cache, dirty_map, dirty_flags):
     row, col = find_king(board)
     size = board.shape[2] - 1
@@ -76,6 +81,7 @@ def quiescent_defender(board, cache, dirty_map, dirty_flags):
             return True
     else:
         return False
+
 
 def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
     row, col = find_king(board)
@@ -112,7 +118,6 @@ def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
 
 
 # The group of small convenience functions ends here
-
 
 
 def get_moves(board: np.array,
@@ -316,9 +321,6 @@ def check_capture(board: np.array,
     # Set up some convenient anonymous functions to check conditions
     is_enemy = lambda r, c: (is_piece(board, r, c) and
                              np.argwhere(board[:, r, c] == 1).item() not in [plane, 2])
-    is_flanked = lambda r, c: ((is_piece(board, r, c) and
-                                teams[np.argwhere(board[:, r, c] == 1).item()] == ally) or
-                               (r, c) in hostile)
 
     # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
     if row > 0 and is_enemy(row - 1, col):
@@ -327,7 +329,7 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row - 1, col), tags):
                 capture_tags(board, tags)
         # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
-        if row - 2 >= 0 and is_flanked(row - 2, col):
+        if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile):
             # Destroy it!
             board[:, row - 1, col] = 0
 
@@ -336,7 +338,7 @@ def check_capture(board: np.array,
             tags = []
             if check_shield_wall(board, (row + 1, col), tags):
                 capture_tags(board, tags)
-        if row + 2 <= size and is_flanked(row + 2, col):
+        if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile):
             board[:, row + 1, col] = 0
 
     if col > 0 and is_enemy(row, col - 1):
@@ -344,7 +346,7 @@ def check_capture(board: np.array,
             tags = []
             if check_shield_wall(board, (row, col - 1), tags):
                 capture_tags(board, tags)
-        if col - 2 >= 0 and is_flanked(row, col - 2):
+        if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile):
             board[:, row, col - 1] = 0
 
     if col < size and is_enemy(row, col + 1):
@@ -352,7 +354,7 @@ def check_capture(board: np.array,
             tags = []
             if check_shield_wall(board, (row, col + 1), tags):
                 capture_tags(board, tags)
-        if col + 2 <= size and is_flanked(row, col + 2):
+        if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile):
             board[:, row, col + 1] = 0
 
 
