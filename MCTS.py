@@ -49,7 +49,8 @@ def simulate(board,
              dirty_map,
              dirty_flags,
              player,
-             visualize=False):
+             visualize=False,
+             ):
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
         display = graphics.initialize()
@@ -82,17 +83,19 @@ def simulate(board,
         terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player,
                                attacker_moves=attacker_moves, defender_moves=defender_moves)
         if terminal:
-            #print(terminal)
             #print(f"This simulation took {i} turns.")
-            return i
+            win = 1 if player == "defenders" else 0
+            return i, win
             #break
         else:
             if (player == "defenders" and
                quiescent_defender(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)):
-                return i
+                #print(f"This simulation took {i} turns.")
+                return i, 1
             elif (player == "attackers" and
                   quiescent_attacker(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)):
-                return i
+                #print(f"This simulation took {i} turns.")
+                return i, 0
             player = toggle_player(player)
 
 

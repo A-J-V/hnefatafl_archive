@@ -6,14 +6,18 @@ from typing import List, Tuple
 
 # This is a global constant that maps piece planes to team
 TEAMS = {0: 1, 1: 2, 2: 2}
+PIECE_FLAGS = None
+
+
+def set_global_piece_flags(piece_flags):
+    global PIECE_FLAGS
+    PIECE_FLAGS = piece_flags
 
 
 # Several small convenience functions that are used in multiple places for condition checks
-def is_piece(board: np.array, row: np.int64, col: np.int64):
+def is_piece(row: np.int64, col: np.int64):
     # This could cause an index out of bounds error!
-    return ((board[0, row, col] == 1) or
-            (board[1, row, col] == 1) or
-            (board[2, row, col] == 1))
+    return PIECE_FLAGS[row, col]
 
 
 def is_king(board: np.array, row: np.int64, col: np.int64):
@@ -46,7 +50,7 @@ def in_bounds(row, col, size):
 
 def is_blank(board, row, col):
     size = board.shape[-1] - 1
-    return in_bounds(row, col, size) and not is_piece(board, row, col)
+    return in_bounds(row, col, size) and not is_piece(row, col)
 
 
 def near_blank(board_array, row, col):
@@ -55,16 +59,16 @@ def near_blank(board_array, row, col):
 
 
 def is_ally(board_array, row, column, ally):
-    return is_piece(board_array, row, column) and TEAMS[np.argwhere(board_array[:, row, column] == 1).item()] == ally
+    return is_piece(row, column) and TEAMS[np.argwhere(board_array[:, row, column] == 1).item()] == ally
 
 
 def is_hostile(board, row, col, ally, hostile):
-    return ((is_piece(board, row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] != ally) or
+    return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] != ally) or
             (row, col) in hostile)
 
 
 def is_flanked(board, row, col, ally, hostile):
-    return ((is_piece(board, row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
+    return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
             ((row, col) in hostile))
 
 
@@ -108,7 +112,7 @@ def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
                 while True:
                     tr += dr
                     tc += dc
-                    if in_bounds(tr, tc, size) and not is_piece(board, tr, tc):
+                    if in_bounds(tr, tc, size) and not is_piece(tr, tc):
                         continue
                     elif in_bounds(tr, tc, size) and is_attacker(board, tr, tc):
                         return True
@@ -144,7 +148,7 @@ def get_moves(board: np.array,
     # This involves unnecessary casting between lists and tuples and packed and unpacked.
     # It should be cleaned up to try to standardize how the index is to be used through the function (and related funcs)
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
-    if not is_piece(board, index[0], index[1]):
+    if not is_piece(index[0], index[1]):
         return np.zeros(40)
     # If the cache of this index is not dirty, immediately return the cached legal moves.
     elif index not in dirty_flags:
@@ -185,7 +189,7 @@ def get_moves(board: np.array,
             tmp_index[axis] = tmp_index[axis] + direction
             if (tmp_index[0] < 0) or (tmp_index[0] > size) or (tmp_index[1] < 0) or (tmp_index[1] > size):
                 break
-            if not is_piece(board, tmp_index[0], tmp_index[1]):
+            if not is_piece(tmp_index[0], tmp_index[1]):
                 # No blocking piece
                 if tmp_index not in restricted or is_king(board, index[0], index[1]):
                     legal_moves[i] = 1
@@ -274,6 +278,10 @@ def make_move(board: np.array,
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 
+    # Update piece_flags
+    PIECE_FLAGS[index[0], index[1]] = 0
+    PIECE_FLAGS[new_index[0], new_index[1]] = 1
+
     # Due to the move, we need to invalidate the cache of old and new location
     dirty_flags.add(index)
     dirty_flags.add(new_index)
@@ -324,7 +332,7 @@ def check_capture(board: np.array,
         hostile.add((size // 2, size // 2))
 
     # Set up some convenient anonymous functions to check conditions
-    is_enemy = lambda r, c: (is_piece(board, r, c) and
+    is_enemy = lambda r, c: (is_piece(r, c) and
                              np.argwhere(board[:, r, c] == 1).item() not in [plane, 2])
 
     # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
@@ -337,6 +345,7 @@ def check_capture(board: np.array,
         if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile):
             # Destroy it!
             board[:, row - 1, col] = 0
+            PIECE_FLAGS[row - 1, col] = 0
 
     if row < size and is_enemy(row + 1, col):
         if is_edge(row + 1, col, size):
@@ -345,6 +354,7 @@ def check_capture(board: np.array,
                 capture_tags(board, tags)
         if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile):
             board[:, row + 1, col] = 0
+            PIECE_FLAGS[row + 1, col] = 0
 
     if col > 0 and is_enemy(row, col - 1):
         if is_edge(row, col - 1, size):
@@ -353,6 +363,7 @@ def check_capture(board: np.array,
                 capture_tags(board, tags)
         if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile):
             board[:, row, col - 1] = 0
+            PIECE_FLAGS[row, col - 1] = 0
 
     if col < size and is_enemy(row, col + 1):
         if is_edge(row, col + 1, size):
@@ -361,6 +372,7 @@ def check_capture(board: np.array,
                 capture_tags(board, tags)
         if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile):
             board[:, row, col + 1] = 0
+            PIECE_FLAGS[row, col + 1] = 0
 
 
 def capture_tags(board_array: np.array,
@@ -369,7 +381,7 @@ def capture_tags(board_array: np.array,
     for tag in tags:
         if np.argwhere(board_array[:, tag[0], tag[1]] == 1).item() != 2:
             board_array[:, tag[0], tag[1]] = 0
-
+            PIECE_FLAGS[tag[0], tag[1]] = 0
 
 def check_shield_wall(board: np.array,
                       index: tuple,
@@ -390,7 +402,7 @@ def check_shield_wall(board: np.array,
             edge = 'right'
 
     not_blank = lambda r, c: board[:, r, c].any() or (r, c) in hostile
-    is_hostile = lambda r, c: ((is_piece(board, r, c) and
+    is_hostile = lambda r, c: ((is_piece(r, c) and
                                 teams[np.argwhere(board[:, r, c] == 1).item()] != ally) or
                                (r, c) in hostile)
 
