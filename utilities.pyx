@@ -63,7 +63,7 @@ def is_hostile(board, row, col, ally, hostile):
             (row, col) in hostile)
 
 
-def quiescent_defender(board, cache, dirty_map, dirty_flags, ):
+def quiescent_defender(board, cache, dirty_map, dirty_flags):
     row, col = find_king(board)
     size = board.shape[2] - 1
     king_moves = get_moves(board=board, index=(row, col), cache=cache,
@@ -75,6 +75,39 @@ def quiescent_defender(board, cache, dirty_map, dirty_flags, ):
         if king_moves[19 + col] == 1 or king_moves[29 + (size - col)] == 1:
             return True
     else:
+        return False
+
+def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
+    row, col = find_king(board)
+    num_surrounding = 0
+    size = board.shape[2] - 1
+    sides = {(row + 1, col), (row - 1, col), (row, col + 1), (row, col - 1)}
+    if in_bounds(row + 1, col, size) and (is_attacker(board, row + 1, col) or (row + 1, col) == (size//2, size/2)):
+        num_surrounding += 1
+        sides.remove((row + 1, col))
+    if in_bounds(row - 1, col, size) and (is_attacker(board, row - 1, col) or (row - 1, col) == (size//2, size/2)):
+        num_surrounding += 1
+        sides.remove((row - 1, col))
+    if in_bounds(row, col + 1, size) and (is_attacker(board, row, col + 1) or (row, col + 1) == (size//2, size/2)):
+        num_surrounding += 1
+        sides.remove((row, col + 1))
+    if in_bounds(row, col - 1, size) and (is_attacker(board, row, col - 1) or (row, col - 1) == (size//2, size/2)):
+        num_surrounding += 1
+        sides.remove((row, col - 1))
+    if num_surrounding == 3:
+        open_space = sides.pop()
+        if is_blank(board, open_space[0], open_space[1]):
+            for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                tr, tc = open_space
+                while True:
+                    tr += dr
+                    tc += dc
+                    if in_bounds(tr, tc, size) and not is_piece(board, tr, tc):
+                        continue
+                    elif in_bounds(tr, tc, size) and is_attacker(board, tr, tc):
+                        return True
+                    else:
+                        break
         return False
 
 

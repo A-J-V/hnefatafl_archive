@@ -276,22 +276,30 @@ def run_tests():
         "Expected defenders to have legal moves, but they did not."
     assert not quiescent_defender(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
         "Expected defenders to NOT be quiescent (imminent victory), but they were."
+    assert not quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to NOT be quiescent (imminent victory), but they were."
 
     b = TaflBoard(tb['defenders_has_moves_2'])
     assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player='defenders'), \
         "Expected defenders to have legal moves, but they did not."
     assert not quiescent_defender(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
         "Expected defenders to NOT be quiescent (imminent victory), but they were."
+    assert not quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to NOT be quiescent (imminent victory), but they were."
 
     b = TaflBoard(tb['defenders_has_moves_3'])
     assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player='defenders'), \
         "Expected defenders to have legal moves, but they did not."
     assert not quiescent_defender(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
         "Expected defenders to NOT be quiescent (imminent victory), but they were."
+    assert not quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to NOT be quiescent (imminent victory), but they were."
 
     b = TaflBoard(tb['defenders_has_moves_4'])
     assert has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player='defenders'), \
         "Expected defenders to have legal moves, but they did not."
+    assert not quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to NOT be quiescent (imminent victory), but they were."
 
     b = TaflBoard(tb['attackers_no_moves_1'])
     assert not has_moves(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags, player='attackers'), \
@@ -333,5 +341,21 @@ def run_tests():
     b = TaflBoard(tb['quiescence_defender_7_10'])
     assert quiescent_defender(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
         "Expected defenders to be quiescent (imminent victory), but they were not."
+
+    b = TaflBoard(tb['quiescence_attacker_7_9'])
+    assert quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to be quiescent (imminent victory), but they were not."
+
+    b = TaflBoard(tb['quiescence_attacker_7_8'])
+    assert quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to be quiescent (imminent victory), but they were not."
+
+    b = TaflBoard(tb['quiescence_attacker_6_8'])
+    assert quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to be quiescent (imminent victory), but they were not."
+
+    b = TaflBoard(tb['quiescence_attacker_7_7'])
+    assert quiescent_attacker(b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags), \
+        "Expected attackers to be quiescent (imminent victory), but they were not."
 
     print("All tests finished.")
