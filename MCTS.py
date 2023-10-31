@@ -77,15 +77,22 @@ def simulate(board,
         i += 1
         if visualize:
             graphics.refresh(board, display)
-            time.sleep(0.25)
+            time.sleep(1)
         # Check for termination
         terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player,
                                attacker_moves=attacker_moves, defender_moves=defender_moves)
         if terminal:
             #print(terminal)
-            print(f"This simulation took {i} turns.")
-            break
+            #print(f"This simulation took {i} turns.")
+            return i
+            #break
         else:
+            if (player == "defenders" and
+               quiescent_defender(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)):
+                return i
+            elif (player == "attackers" and
+                  quiescent_attacker(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)):
+                return i
             player = toggle_player(player)
 
 

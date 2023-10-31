@@ -1,7 +1,7 @@
 from collections import deque
 import cython
 import numpy as np
-cimport numpy as np
+#cimport numpy as np
 from typing import List, Tuple
 
 # This is a global constant that maps piece planes to team
@@ -9,7 +9,7 @@ TEAMS = {0: 1, 1: 2, 2: 2}
 
 
 # Several small convenience functions that are used in multiple places for condition checks
-cdef is_piece(board: np.array, row: np.int64, col: np.int64):
+def is_piece(board: np.array, row: np.int64, col: np.int64):
     # This could cause an index out of bounds error!
     return ((board[0, row, col] == 1) or
             (board[1, row, col] == 1) or
@@ -115,12 +115,12 @@ def quiescent_attacker(board, cache, dirty_map, dirty_flags, ):
 
 
 
-cpdef get_moves(board: np.array,
+def get_moves(board: np.array,
                 index: Tuple[int, int],
                 cache: np.array,
                 dirty_map: dict,
                 dirty_flags: np.array,
-                ) except *:
+                ):
     """
     Return a binary array of legal moves.
 
@@ -144,7 +144,7 @@ cpdef get_moves(board: np.array,
     # If the cache of this index is not dirty, immediately return the cached legal moves.
     elif index not in dirty_flags:
         return cache[:, index[0], index[1]]
-    cdef int size
+    #cdef int size
     size = board.shape[2] - 1
     restricted = [[0, 0], [0, size], [size, 0], [size, size], [size // 2, size // 2]]
     dirty_indices = []
@@ -152,20 +152,23 @@ cpdef get_moves(board: np.array,
     # Need to go through the 40 possible moves and check the legality of each...
     # 0-9 is up 1-10, 10-19 is down 1-10, 20-29 is left 1-10, 30-39 is right 1-10
 
-    cdef int k
-    cdef tuple instruction
-    cdef int i
-    cdef int axis
-    cdef int direction
-    cdef int dx[4]
-    dx[0], dx[1], dx[2], dx[3] = 0, 0, 1, 1
-    cdef int dy[4]
-    dy[0], dy[1], dy[2], dy[3] = -1, 1, -1, 1
-    cdef int initial_row
-    cdef int initial_col
+    #cdef int k
+    #cdef tuple instruction
+    #cdef int i
+    #cdef int axis
+    #cdef int direction
+    #cdef int dx[4]
+    dx = [0, 0, 1, 1]
+    #dx[0], dx[1], dx[2], dx[3] = 0, 0, 1, 1
+    #cdef int dy[4]
+    dy = [-1, 1, -1, 1]
+    #dy[0], dy[1], dy[2], dy[3] = -1, 1, -1, 1
+    #cdef int initial_row
+    #cdef int initial_col
     initial_row = index[0]
     initial_col = index[1]
-    cdef int tmp_index[2]
+    #cdef int tmp_index[2]
+    tmp_index = [initial_row, initial_col]
 
     for k in range(4):
         axis = dx[k]
@@ -193,13 +196,11 @@ cpdef get_moves(board: np.array,
     return cache[:, index[0], index[1]]
 
 
-cpdef update_action_space(board: np.array,
+def update_action_space(board: np.array,
                         cache: np.array,
                         dirty_map: dict,
                         dirty_flags: np.array,
-                        ) except *:
-    cdef int r
-    cdef int c
+                        ):
     for (r, c) in dirty_flags.copy():
         _ = get_moves(board,
                       (r, c),
@@ -223,11 +224,11 @@ def has_moves(board: np.array,
     return cache[:, mask].any()
 
 
-cpdef all_legal_moves(board: np.array,
+def all_legal_moves(board: np.array,
                       cache: np.array,
                       dirty_map: dict,
                       dirty_flags: np.array,
-                      player: str = 'defenders') except *:
+                      player: str = 'defenders'):
     """Return the action-space of all legal moves for a single player"""
     update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
     if player == 'attackers':
@@ -248,7 +249,7 @@ def make_move(board: np.array,
               ) -> tuple:
     """Move the piece at index according to move. Assumes the move is legal."""
     # Find which plane the piece is on (which piece type it is)
-    cdef int plane
+    #cdef int plane
     if board[0, index[0], index[1]] == 1:
         plane = 0
     elif board[1, index[0], index[1]] == 1:

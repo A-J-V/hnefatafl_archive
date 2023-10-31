@@ -21,18 +21,21 @@ if __name__ == "__main__":
     #         visualize=True)
     #print(b.dirty_flags)
     #cProfile.run("simulate(b.board, b.cache, b.dirty_map, b.dirty_flags, 'attackers', visualize=False)")
-    #times = []
-    #for _ in range(500):
-    #    start = time.time()
-    #    b = hnefatafl.TaflBoard()
-    #    simulate(b.board,
-    #             b.cache,
-    #             b.dirty_map,
-    #             b.dirty_flags,
-    #             'attackers',
-    #             visualize=False)
-    #    times.append(time.time() - start)
-    #print(sum(times) / len(times))
+    times = []
+    turns = []
+    for _ in range(1000):
+        b = hnefatafl.TaflBoard()
+        start = time.time()
+        t = simulate(b.board,
+                 b.cache,
+                 b.dirty_map,
+                 b.dirty_flags,
+                 'attackers',
+                 visualize=False)
+        times.append(time.time() - start)
+        turns.append(t)
+    print(f"Average rollout time: {sum(times) / len(times)}")
+    print(f"Average rollout turns: {sum(turns) / len(turns)}")
 
     #display = graphics.initialize()
     #graphics.refresh(b.board, display)
@@ -46,4 +49,7 @@ if __name__ == "__main__":
     #    make_move(b.board, (row, col), target)
     #    graphics.refresh(b.board, display)
 
+    # Need to add many tests that check not just a static state, but the transition between states.
+    # These tests have a starting board, then make a move, and check that the state after the move
+    # such as the board and legal moves and dirty flags are all as expected.
     run_tests()

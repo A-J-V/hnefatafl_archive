@@ -38,7 +38,7 @@ class TaflBoard:
         # Stack the planes into an array, M x N x N, where N is board length/width and M is number of piece types
         self.board = np.stack([a_plane, d_plane, k_plane])
         self.shape = self.board.shape[-1]
-        # Define a 2D array of dirty flags
+        # Define a set of dirty flags
         self.dirty_flags = set(product(list(range(self.shape)), list(range(self.shape))))
         # Define a dictionary mapping index i to a list of indices whose caches are invalidated when i moves
         self.dirty_map = {(row, col): [] for (row, col) in product(list(range(self.shape)), list(range(self.shape)))}
