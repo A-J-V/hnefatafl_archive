@@ -358,4 +358,8 @@ def run_tests():
     assert quiescent_attacker(b.board), \
         "Expected attackers to be quiescent (imminent victory), but they were not."
 
+    b = TaflBoard(tb['not_encircled_edge_case'])
+    assert not check_encirclement(b.board), \
+        "Expected encirclement to be False, but it was True."
+
     print("All tests finished.")

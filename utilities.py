@@ -601,22 +601,42 @@ def check_capture(board: np.array,
             PIECE_FLAGS[row, col + 1] = 0
 
 
-def capture_tags(board_array: np.array,
+def capture_tags(board: np.array,
                  tags: list,
                  ) -> None:
+    """
+    Capture any non-King pieces who are "tagged" as being trapped in a shield wall.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
+    :return: None; any enemies who are trapped in a shield wall are eliminated by this function.
+    """
     for tag in tags:
-        if np.argwhere(board_array[:, tag[0], tag[1]] == 1).item() != 2:
-            board_array[:, tag[0], tag[1]] = 0
+        if np.argwhere(board[:, tag[0], tag[1]] == 1).item() != 2:
+            board[:, tag[0], tag[1]] = 0
             PIECE_FLAGS[tag[0], tag[1]] = 0
 
+
 def check_shield_wall(board: np.array,
-                      index: tuple,
+                      index: Tuple[int, int],
                       tags: list,
                       edge: str = '',
                       ) -> bool:
-    """Recursively check whether a shield wall capture can be executed."""
+    """
+    Recursively check whether a shield wall capture can be executed.
+
+    This is an ugly function and should be rewritten from scratch using queue-based flood-fill, not recursion.
+
+    :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
+    :param tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
+    :param edge: The board edge against which there may be a shield wall.
+    :return: True if pieces have been trapped in a shield wall, False otherwise.
+    """
     row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
 
+    # A shield wall can only happen if units are "pinned" against an edge.
+    # To check if they're pinned, we need to know the edge along which we're checking.
     if not edge:
         if row == 0:
             edge = 'up'
@@ -627,21 +647,24 @@ def check_shield_wall(board: np.array,
         else:
             edge = 'right'
 
-    not_blank = lambda r, c: board[:, r, c].any() or (r, c) in hostile
-    is_hostile = lambda r, c: ((is_piece(r, c) and
-                                teams[np.argwhere(board[:, r, c] == 1).item()] != ally) or
-                               (r, c) in hostile)
-
     h_mapping = {'up': (row + 1, col), 'down': (row - 1, col), 'left': (row, col + 1), 'right': (row, col - 1)}
     b_mapping = {'up': ((row, col - 1), (row, col + 1)), 'down': ((row, col - 1), (row, col + 1)),
                  'left': ((row - 1, col), (row + 1, col)), 'right': ((row - 1, col), (row + 1, col))}
     h_dir = h_mapping[edge]
     b_dirs = b_mapping[edge]
 
-    if (is_hostile(h_dir[0], h_dir[1]) and
-            not_blank(b_dirs[0][0], b_dirs[0][1]) and
-            not_blank(b_dirs[1][0], b_dirs[1][1])
-    ):
+    if board[0, h_dir[0], h_dir[1]] == 1:
+        plane = 0
+    elif board[1, h_dir[0], h_dir[1]] == 1:
+        plane = 1
+    else:
+        plane = 2
+
+    if (
+       ((is_piece(h_dir[0], h_dir[1]) and TEAMS[plane] != ally) or (h_dir[0], h_dir[1]) in hostile) and
+       (is_piece(b_dirs[0][0], b_dirs[0][1]) or (b_dirs[0][0], b_dirs[0][1]) in hostile) and
+       (is_piece(b_dirs[1][0], b_dirs[1][1]) or (b_dirs[1][0], b_dirs[1][1]) in hostile)
+       ):
         tags.append(index)
         adjacent_friends = []
         if is_ally(board, b_dirs[0][0], b_dirs[0][1], ally) and (b_dirs[0][0], b_dirs[0][1]) not in tags:
@@ -656,13 +679,29 @@ def check_shield_wall(board: np.array,
     return True
 
 
-def is_fort(board, index, defender_tags, interior_tags):
-    """Check whether the King is in an edge fort."""
-    # This currently doesn't consider corners to be legal pieces of a fort, but it should.
+def is_fort(board: np.array,
+            index: Tuple[int, int],
+            defender_tags: List[Tuple[int, int],],
+            interior_tags: List[Tuple[int, int],],
+            ) -> bool:
+    """
+    Check whether the King is in an edge fort.
+
+    :param np.array board: The 3D NumPy "board" array on which the game is being played.
+    :param Tuple[int, int] index: The current index of the tile being checked with fort logic.
+    :param list defender_tags: A list of defender indices. If this is a fort, then these are the "walls" of the fort.
+    :param list interior_tags: A list of interior tiles. If this is a fort, then these are "inside" the fort.
+    :return: True if a fort has been made, False otherwise. This does not guarantee that the fort is impenetrable.
+    """
     row, col = index
     size = board.shape[-1] - 1
     interior_tags.append(index)
     adjacent_interior = []
+
+    # Check in each of the 4 directions around index.
+    # If it's out of bounds, ignore it. If it's a blank that hasn't been checked yet, add it to adjacent_interior.
+    # If it's a defender that hasn't been tagged yet, add it to defender_tags.
+    # Otherwise, it must be an attacker or a corner, so this can't be a fort. Return false.
     for step in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
         if not in_bounds(row + step[0], col + step[1], size):
             continue
@@ -681,7 +720,21 @@ def is_fort(board, index, defender_tags, interior_tags):
     return True
 
 
-def verify_encirclement(board):
+def verify_encirclement(board: np.array) -> Tuple[list, list]:
+    """
+    Return the "walls" of an encirclement.
+
+    The function check_encirclement() doesn't record the attackers who form the encirclement, because almost always
+    there won't be an encirclement. So it chooses to quickly try to dismiss encirclement and not contrive to figure out
+    attackers who may form an encirclement. If it turns out that there is an encirclement, this algorithm efficiently
+    uses a queue-based flood fill from the defenders outward to find the attackers who make up the "wall" around them.
+    Then we use is_impenetrable with option='encirclement' to confirm that it is a game-ending encirclement that
+    can't be escaped.
+
+    :param np.array board: The 3D NumPy "board" array on which the game is being played.
+    :return: A tuple containing two lists, one list of the encircling attackers and one list of encircled tiles.
+    """
+
     size = board.shape[-1] - 1
     queue = deque()
     visited = set()
@@ -709,7 +762,21 @@ def verify_encirclement(board):
     return attacker_walls, interior_tiles
 
 
-def is_impenetrable(board, wall_tags, interior_tags, option='fort'):
+def is_impenetrable(board: np.array,
+                    wall_tags: list,
+                    interior_tags: list,
+                    option: str = 'fort',
+                    ) -> bool:
+    """
+    Confirm whether a fort/encirclement is impenetrable (game-ending).
+
+    :param board: The 3D NumPy 'board' array on which the game is being played.
+    :param wall_tags: A list of (row, col) tuples, each of which is a wall of the fort/encirclement.
+    :param interior_tags: A list of (row, col) tuples, each of which is a tile inside the fort/encirclement.
+    :param option: 'fort' or 'encirclement', depending on what we are checking for impenetrability.
+    :return: True if the fort/encirclement is impenetrable, False otherwise.
+    """
+
     size = board.shape[-1] - 1
     if option == 'encirclement':
         is_wall = is_attacker
@@ -718,33 +785,40 @@ def is_impenetrable(board, wall_tags, interior_tags, option='fort'):
         is_wall = is_defender
         is_safe = lambda r, c: (r, c) in interior_tags
 
-    def vertical_vuln(r, c):
+    def vertical_vulnerable(r, c):
         if ((not in_bounds(r - 1, c, size) or is_wall(board, r - 1, c) or is_safe(r - 1, c)) or
-                (not in_bounds(r + 1, c, size) or is_wall(board, r + 1, c) or is_safe(r + 1, c))):
+           (not in_bounds(r + 1, c, size) or is_wall(board, r + 1, c) or is_safe(r + 1, c))):
             return False
         else:
             return True
 
-    def horizontal_vuln(r, c):
+    def horizontal_vulnerable(r, c):
         if ((not in_bounds(r, c - 1, size) or is_wall(board, r, c - 1) or is_safe(r, c - 1)) or
-                (not in_bounds(r, c + 1, size) or is_wall(board, r, c + 1) or is_safe(r, c + 1))):
+           (not in_bounds(r, c + 1, size) or is_wall(board, r, c + 1) or is_safe(r, c + 1))):
             return False
         else:
             return True
 
     for wall in wall_tags:
         row, col = wall
-        if vertical_vuln(row, col) or horizontal_vuln(row, col):
+        if vertical_vulnerable(row, col) or horizontal_vulnerable(row, col):
             return False
 
     return True
 
 
-def check_encirclement(board):
+def check_encirclement(board: np.array) -> bool:
+    """
+    Check whether the attackers have encircled all defenders.
+
+    :param np.array board: The 3D NumPy 'board' array on which the game is being played.
+    :return: True if the attackers have encircled all defenders, otherwise False.
+    """
     size = board.shape[-1] - 1
     queue = deque()
     visited = set()
 
+    # This is queueing every tile that is on the edge.
     for i in range(size + 1):
         queue.append((i, 0))
         queue.append((0, i))
@@ -757,10 +831,15 @@ def check_encirclement(board):
 
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
+    # The algorithm is an outward-in flood-fill. If it touches a defender, defenders are not encircled.
+    # If the queue comes up empty never having touched a defender, then the defenders must be encircled.
     while queue:
         row, col = queue.popleft()
-        if is_attacker(board, row, col):
+        if is_defender(board, row, col):
+            return False
+        elif is_attacker(board, row, col):
             continue
+
         for dr, dc in directions:
             nr, nc = row + dr, col + dc
 
