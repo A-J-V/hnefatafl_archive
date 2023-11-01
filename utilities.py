@@ -6,33 +6,23 @@ from typing import List, Tuple
 
 # This is a global constant that maps piece planes to team. It is game specific.
 TEAMS = {0: 1, 1: 2, 2: 2}
-# This global variable is set with set_global_piece_flags during the initialization of the game.
-# It is read by is_piece and can be written to by make_move(), check_capture(), and capture_tags().
-PIECE_FLAGS = np.array([])
-
-
-def set_global_piece_flags(piece_flags: np.array) -> None:
-    """
-    Set the global variable PIECE_FLAGS.
-    This should only be called once at the start of the game!
-
-    :param np.array piece_flags: A 2D binary array where 1 means a piece is present at (i, j), 0 means not present.
-    """
-    global PIECE_FLAGS
-    PIECE_FLAGS = piece_flags
 
 
 # Several small convenience functions that are used in multiple places for condition checks
-def is_piece(row: int, col: int) -> int:
+def is_piece(row: int,
+             col: int,
+             piece_flags: np.array,
+             ) -> int:
     """
     Return 1 if a piece is located at (row, col), 0 otherwise.
 
     :param int row: The row index.
     :param int col: The col index.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: 1 if there is a piece at (row, col), 0 otherwise.
     """
     # This could cause an index out of bounds error!
-    return PIECE_FLAGS[row, col]
+    return piece_flags[row, col]
 
 
 def is_king(board: np.array, row: int, col: int) -> bool:
@@ -120,32 +110,34 @@ def in_bounds(row: int, col: int, size: int) -> bool:
     return 0 <= row <= size and 0 <= col <= size
 
 
-def is_blank(row: int, col: int, size: int) -> bool:
+def is_blank(row: int, col: int, size: int, piece_flags: np.array) -> bool:
     """
     Return True if NO piece is located at (row, col), False otherwise.
 
     :param int row: The row index.
     :param int col: The col index.
     :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if there is NO piece at (row, col), False otherwise.
     """
-    return in_bounds(row, col, size) and not is_piece(row, col)
+    return in_bounds(row, col, size) and not is_piece(row, col, piece_flags)
 
 
-def near_blank(row: int, col: int, size: int) -> bool:
+def near_blank(row: int, col: int, size: int, piece_flags: np.array) -> bool:
     """
     Return True if at least one tile adjacent to (row, col) is blank, False otherwise.
 
     :param int row: The row index.
     :param int col: The col index.
     :param int size: The size of the board. This is the max valid index. Expected to be len(board) - 1, not len(board).
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return:
     """
-    return (is_blank(row - 1, col, size) or is_blank(row + 1, col, size) or
-            is_blank(row, col - 1, size) or is_blank(row, col + 1, size))
+    return (is_blank(row - 1, col, size, piece_flags) or is_blank(row + 1, col, size, piece_flags) or
+            is_blank(row, col - 1, size, piece_flags) or is_blank(row, col + 1, size, piece_flags))
 
 
-def is_ally(board: np.array, row: int, col: int, ally: int) -> bool:
+def is_ally(board: np.array, row: int, col: int, ally: int, piece_flags: np.array) -> bool:
     """
     Returns True if a piece at (row, col) is the same team as the arg ally.
 
@@ -153,12 +145,13 @@ def is_ally(board: np.array, row: int, col: int, ally: int) -> bool:
     :param int row: The row index.
     :param int col: The col index.
     :param int ally: The team being checked against.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if a piece at (row, col) is on the team of the arg "ally".
     """
-    return is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally
+    return is_piece(row, col, piece_flags) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally
 
 
-def is_enemy(board: np.array, row: int, col: int, plane: int) -> bool:
+def is_enemy(board: np.array, row: int, col: int, plane: int, piece_flags: np.array) -> bool:
     """
     Return True if the piece at (row, col) is a non-King enemy according plane.
 
@@ -166,12 +159,13 @@ def is_enemy(board: np.array, row: int, col: int, plane: int) -> bool:
     :param int row: The row index.
     :param int col: The col index.
     :param int plane: The piece plane. is_enemy checks for non-King "enemies" from the perspective of this plane.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if the (row, col) contains a non-King enemy, False otherwise.
     """
-    return is_piece(row, col) and np.argwhere(board[:, row, col] == 1).item() not in [plane, 2]
+    return is_piece(row, col, piece_flags) and np.argwhere(board[:, row, col] == 1).item() not in [plane, 2]
 
 
-def is_hostile(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,]) -> bool:
+def is_hostile(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,], piece_flags: np.array) -> bool:
     """
     Returns True if (row, col) is hostile to the "ally" team.
 
@@ -180,13 +174,14 @@ def is_hostile(board: np.array, row: int, col: int, ally: int, hostile: List[tup
     :param int col:  The col index.
     :param int ally:  The team being checked against.
     :param list hostile: A list of hostile tiles, such as corners or (sometimes) the throne.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if (row, col) is hostile to the "ally" team, False otherwise.
     """
-    return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] != ally) or
+    return ((is_piece(row, col, piece_flags) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] != ally) or
             (row, col) in hostile)
 
 
-def is_flanked(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,]) -> bool:
+def is_flanked(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,], piece_flags: np.array) -> bool:
     """
     Returns True if (row, col) is flanked by hostile tiles.
 
@@ -195,9 +190,10 @@ def is_flanked(board: np.array, row: int, col: int, ally: int, hostile: List[tup
     :param int col:  The col index.
     :param int ally:  The team being checked against.
     :param list hostile: A list of hostile tiles, such as corners or (sometimes) the throne.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if (row, col) flanked by hostile tiles, False otherwise.
     """
-    return ((is_piece(row, col) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
+    return ((is_piece(row, col, piece_flags) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally) or
             ((row, col) in hostile))
 
 
@@ -224,7 +220,12 @@ def get_nice_variables(board: np.array,
     return row, col, TEAMS, size, hostile, plane, ally
 
 
-def quiescent_defender(board: np.array, cache: np.array, dirty_map: dict, dirty_flags: set) -> bool:
+def quiescent_defender(board: np.array,
+                       cache: np.array,
+                       dirty_map: dict,
+                       dirty_flags: set,
+                       piece_flags: np.array,
+                       ) -> bool:
     """
     Returns True if the Defenders have imminent victory (they can win if they move right now), False otherwise.
 
@@ -237,12 +238,18 @@ def quiescent_defender(board: np.array, cache: np.array, dirty_map: dict, dirty_
     :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if the Defenders can immediately win by the King escaping, False otherwise.
     """
     row, col = find_king(board)
     size = board.shape[2] - 1
-    king_moves = get_moves(board=board, index=(row, col), cache=cache,
-                           dirty_map=dirty_map, dirty_flags=dirty_flags)
+    king_moves = get_moves(board=board,
+                           index=(row, col),
+                           cache=cache,
+                           dirty_map=dirty_map,
+                           dirty_flags=dirty_flags,
+                           piece_flags=piece_flags,
+                           )
 
     # If the King is on any edge, then there are exactly two moves that he may have that would end the game.
     # Depending on which edge he is on and where, we check those two moves. If at least one is legal,
@@ -257,7 +264,7 @@ def quiescent_defender(board: np.array, cache: np.array, dirty_map: dict, dirty_
         return False
 
 
-def quiescent_attacker(board: np.array) -> bool:
+def quiescent_attacker(board: np.array, piece_flags: np.array) -> bool:
     """
     Returns True if the Attackers have imminent victory (they can win if they move right now), False otherwise.
 
@@ -266,6 +273,7 @@ def quiescent_attacker(board: np.array) -> bool:
     These semi-random rollouts typically take 50% - 70% fewer turns than a genuinely random rollout would.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if the Attackers can immediately win by capturing the King, False otherwise.
     """
     row, col = find_king(board)
@@ -290,7 +298,7 @@ def quiescent_attacker(board: np.array) -> bool:
     # If the King already has three hostile tiles around him, examine the fourth blank tile.
     if num_surrounding == 3:
         open_space = sides.pop()
-        if is_blank(open_space[0], open_space[1], size):
+        if is_blank(open_space[0], open_space[1], size, piece_flags):
             for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 tr, tc = open_space
                 # If we can walk from the blank tile in any direction and bump an attacker, that attacker could
@@ -298,7 +306,7 @@ def quiescent_attacker(board: np.array) -> bool:
                 while True:
                     tr += dr
                     tc += dc
-                    if in_bounds(tr, tc, size) and not is_piece(tr, tc):
+                    if in_bounds(tr, tc, size) and not is_piece(tr, tc, piece_flags):
                         continue
                     elif in_bounds(tr, tc, size) and is_attacker(board, tr, tc):
                         return True
@@ -315,6 +323,7 @@ def get_moves(board: np.array,
               cache: np.array,
               dirty_map: dict,
               dirty_flags: set,
+              piece_flags: np.array
               ) -> np.array:
     """
     Return a binary array of legal moves.
@@ -324,16 +333,17 @@ def get_moves(board: np.array,
     Indices 0-9 encode "move up 1-10 spaces", indices 10-19 encode "move down 1-10 spaces",
     Indices 20-29 encode "move left 1-10 spaces", indices 30-39 encode "move right 1-10 spaces".
 
-    :param np.array board: a 2D NumPy array representing the board
+    :param np.array board: a 2D NumPy array representing the board.
     :param tuple index: a tuple(int, int) representing the index of the piece whose legal moves we're checking.
-    :param np.array cache: a reference to an array of the cached action space
-    :param dict dirty_map: a dict mapping index i to a list of indices whose caches are invalidate if i moves
-    :param np.array dirty_flags: a 2D array of flags indicating whether the move cache of (row, col) is dirty
-    :return: A 1D binary NumPy array of length 40 representing legal moves
+    :param np.array cache: a reference to an array of the cached action space.
+    :param dict dirty_map: a dict mapping index i to a list of indices whose caches are invalidate if i moves.
+    :param np.array dirty_flags: a 2D array of flags indicating whether the move cache of (row, col) is dirty.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
+    :return: A 1D binary NumPy array of length 40 representing legal moves.
     """
 
     # If there is no piece on this tile, return immediately (there are no legal moves if there's no piece!)
-    if not is_piece(index[0], index[1]):
+    if not is_piece(index[0], index[1], piece_flags):
         return np.zeros(40)
 
     # If the cache of this index is not dirty, immediately return the cached legal moves.
@@ -375,7 +385,7 @@ def get_moves(board: np.array,
             tmp_index[axis] = tmp_index[axis] + direction
             if (tmp_index[0] < 0) or (tmp_index[0] > size) or (tmp_index[1] < 0) or (tmp_index[1] > size):
                 break
-            if not is_piece(tmp_index[0], tmp_index[1]):
+            if not is_piece(tmp_index[0], tmp_index[1], piece_flags):
                 # No blocking piece
                 if tmp_index not in restricted or is_king(board, index[0], index[1]):
                     legal_moves[i] = 1
@@ -395,6 +405,7 @@ def update_action_space(board: np.array,
                         cache: np.array,
                         dirty_map: dict,
                         dirty_flags: set,
+                        piece_flags: np.array,
                         ) -> None:
     """
     Refresh any dirty cache locations.
@@ -404,6 +415,7 @@ def update_action_space(board: np.array,
     :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: None
     """
 
@@ -415,6 +427,7 @@ def update_action_space(board: np.array,
                       cache,
                       dirty_map,
                       dirty_flags,
+                      piece_flags,
                       )
 
 
@@ -422,7 +435,8 @@ def has_moves(board: np.array,
               cache: np.array,
               dirty_map: dict,
               dirty_flags: set,
-              player: str = 'defenders',
+              player: str,
+              piece_flags: np.array,
               ) -> bool:
     """
     Check whether a player has any legal moves.
@@ -438,9 +452,10 @@ def has_moves(board: np.array,
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
     :param str player: The player. It is either "attackers" or "defenders".
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if player has remaining moves, False if player has no legal moves.
     """
-    update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
+    update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, piece_flags=piece_flags)
     if player == 'attackers':
         mask = board[0, :, :] == 1
     else:
@@ -452,7 +467,8 @@ def all_legal_moves(board: np.array,
                     cache: np.array,
                     dirty_map: dict,
                     dirty_flags: set,
-                    player: str = 'defenders',
+                    player: str,
+                    piece_flags: np.array,
                     ) -> np.array:
     """
     Return a 3D NumPy array representing the action-space of a single player.
@@ -463,9 +479,10 @@ def all_legal_moves(board: np.array,
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
     :param str player: The player. It is either "attackers" or "defenders".
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: A 3D NumPy array representing the action-space of a single player. For standard hnefatafl, it is 40x11x11.
     """
-    update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
+    update_action_space(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, piece_flags=piece_flags)
     if player == 'attackers':
         mask = board[0, :, :] != 1
     else:
@@ -481,6 +498,7 @@ def make_move(board: np.array,
               cache: np.array,
               dirty_map: dict,
               dirty_flags: set,
+              piece_flags: np.array,
               ) -> tuple:
     """
     Move the piece at index according to move. Assumes the move is legal.
@@ -492,6 +510,7 @@ def make_move(board: np.array,
     :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: The new (row, col) tuple that the piece moved to from the old index.
     """
 
@@ -515,9 +534,9 @@ def make_move(board: np.array,
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 
-    # Update PIECE_FLAGS. This is writing to a global variable.
-    PIECE_FLAGS[index[0], index[1]] = 0
-    PIECE_FLAGS[new_index[0], new_index[1]] = 1
+    # Update piece_flags. This is a reference to the cache of piece locations.
+    piece_flags[index[0], index[1]] = 0
+    piece_flags[new_index[0], new_index[1]] = 1
 
     # Due to the move, we need to invalidate the cache of old and new location
     dirty_flags.add(index)
@@ -535,6 +554,7 @@ def make_move(board: np.array,
                   cache,
                   dirty_map,
                   dirty_flags,
+                  piece_flags
                   )
 
     # Update the cache of the indices affected by the move to the new location
@@ -546,12 +566,14 @@ def make_move(board: np.array,
 
 def check_capture(board: np.array,
                   index: tuple,
+                  piece_flags: np.array,
                   ) -> None:
     """
     Given an index, checks to see if any basic enemies pieces around it are captured.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: None; if a piece can be captured, it will be automatically within this function.
     """
     # Set up some convenient variables
@@ -562,64 +584,67 @@ def check_capture(board: np.array,
         hostile.add((size // 2, size // 2))
 
     # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
-    if row > 0 and is_enemy(board, row - 1, col, plane):
+    if row > 0 and is_enemy(board, row - 1, col, plane, piece_flags):
         if is_edge(row - 1, col, size):
             tags = []
-            if check_shield_wall(board, (row - 1, col), tags):
-                capture_tags(board, tags)
+            if check_shield_wall(board, (row - 1, col), tags, piece_flags):
+                capture_tags(board, tags, piece_flags=piece_flags)
         # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
-        if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile):
+        if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile, piece_flags):
             # Destroy it!
             board[:, row - 1, col] = 0
-            PIECE_FLAGS[row - 1, col] = 0
+            piece_flags[row - 1, col] = 0
 
-    if row < size and is_enemy(board, row + 1, col, plane):
+    if row < size and is_enemy(board, row + 1, col, plane, piece_flags):
         if is_edge(row + 1, col, size):
             tags = []
-            if check_shield_wall(board, (row + 1, col), tags):
-                capture_tags(board, tags)
-        if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile):
+            if check_shield_wall(board, (row + 1, col), tags, piece_flags):
+                capture_tags(board, tags, piece_flags=piece_flags)
+        if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile, piece_flags):
             board[:, row + 1, col] = 0
-            PIECE_FLAGS[row + 1, col] = 0
+            piece_flags[row + 1, col] = 0
 
-    if col > 0 and is_enemy(board, row, col - 1, plane):
+    if col > 0 and is_enemy(board, row, col - 1, plane, piece_flags):
         if is_edge(row, col - 1, size):
             tags = []
-            if check_shield_wall(board, (row, col - 1), tags):
-                capture_tags(board, tags)
-        if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile):
+            if check_shield_wall(board, (row, col - 1), tags, piece_flags):
+                capture_tags(board, tags, piece_flags=piece_flags)
+        if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile, piece_flags):
             board[:, row, col - 1] = 0
-            PIECE_FLAGS[row, col - 1] = 0
+            piece_flags[row, col - 1] = 0
 
-    if col < size and is_enemy(board, row, col + 1, plane):
+    if col < size and is_enemy(board, row, col + 1, plane, piece_flags):
         if is_edge(row, col + 1, size):
             tags = []
-            if check_shield_wall(board, (row, col + 1), tags):
-                capture_tags(board, tags)
-        if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile):
+            if check_shield_wall(board, (row, col + 1), tags, piece_flags):
+                capture_tags(board, tags, piece_flags=piece_flags)
+        if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile, piece_flags):
             board[:, row, col + 1] = 0
-            PIECE_FLAGS[row, col + 1] = 0
+            piece_flags[row, col + 1] = 0
 
 
 def capture_tags(board: np.array,
                  tags: list,
+                 piece_flags: np.array,
                  ) -> None:
     """
     Capture any non-King pieces who are "tagged" as being trapped in a shield wall.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
-    :param tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
+    :param list tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: None; any enemies who are trapped in a shield wall are eliminated by this function.
     """
     for tag in tags:
         if np.argwhere(board[:, tag[0], tag[1]] == 1).item() != 2:
             board[:, tag[0], tag[1]] = 0
-            PIECE_FLAGS[tag[0], tag[1]] = 0
+            piece_flags[tag[0], tag[1]] = 0
 
 
 def check_shield_wall(board: np.array,
                       index: Tuple[int, int],
                       tags: list,
+                      piece_flags: np.array,
                       edge: str = '',
                       ) -> bool:
     """
@@ -630,6 +655,7 @@ def check_shield_wall(board: np.array,
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
     :param tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :param edge: The board edge against which there may be a shield wall.
     :return: True if pieces have been trapped in a shield wall, False otherwise.
     """
@@ -661,18 +687,18 @@ def check_shield_wall(board: np.array,
         plane = 2
 
     if (
-       ((is_piece(h_dir[0], h_dir[1]) and TEAMS[plane] != ally) or (h_dir[0], h_dir[1]) in hostile) and
-       (is_piece(b_dirs[0][0], b_dirs[0][1]) or (b_dirs[0][0], b_dirs[0][1]) in hostile) and
-       (is_piece(b_dirs[1][0], b_dirs[1][1]) or (b_dirs[1][0], b_dirs[1][1]) in hostile)
+       ((is_piece(h_dir[0], h_dir[1], piece_flags) and TEAMS[plane] != ally) or (h_dir[0], h_dir[1]) in hostile) and
+       (is_piece(b_dirs[0][0], b_dirs[0][1], piece_flags) or (b_dirs[0][0], b_dirs[0][1]) in hostile) and
+       (is_piece(b_dirs[1][0], b_dirs[1][1], piece_flags) or (b_dirs[1][0], b_dirs[1][1]) in hostile)
        ):
         tags.append(index)
         adjacent_friends = []
-        if is_ally(board, b_dirs[0][0], b_dirs[0][1], ally) and (b_dirs[0][0], b_dirs[0][1]) not in tags:
+        if is_ally(board, b_dirs[0][0], b_dirs[0][1], ally, piece_flags) and (b_dirs[0][0], b_dirs[0][1]) not in tags:
             adjacent_friends.append((b_dirs[0][0], b_dirs[0][1]))
-        if is_ally(board, b_dirs[1][0], b_dirs[1][1], ally) and (b_dirs[1][0], b_dirs[1][1]) not in tags:
+        if is_ally(board, b_dirs[1][0], b_dirs[1][1], ally, piece_flags) and (b_dirs[1][0], b_dirs[1][1]) not in tags:
             adjacent_friends.append((b_dirs[1][0], b_dirs[1][1]))
         for ally in adjacent_friends:
-            if not check_shield_wall(board, ally, tags, edge):
+            if not check_shield_wall(board, ally, tags, piece_flags, edge):
                 return False
     else:
         return False
@@ -683,6 +709,7 @@ def is_fort(board: np.array,
             index: Tuple[int, int],
             defender_tags: List[Tuple[int, int],],
             interior_tags: List[Tuple[int, int],],
+            piece_flags: np.array,
             ) -> bool:
     """
     Check whether the King is in an edge fort.
@@ -691,6 +718,7 @@ def is_fort(board: np.array,
     :param Tuple[int, int] index: The current index of the tile being checked with fort logic.
     :param list defender_tags: A list of defender indices. If this is a fort, then these are the "walls" of the fort.
     :param list interior_tags: A list of interior tiles. If this is a fort, then these are "inside" the fort.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if a fort has been made, False otherwise. This does not guarantee that the fort is impenetrable.
     """
     row, col = index
@@ -705,7 +733,7 @@ def is_fort(board: np.array,
     for step in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
         if not in_bounds(row + step[0], col + step[1], size):
             continue
-        elif is_blank(row + step[0], col + step[1], size) or is_king(board, row + step[0], col + step[1]):
+        elif is_blank(row + step[0], col + step[1], size, piece_flags) or is_king(board, row + step[0], col + step[1]):
             if (row + step[0], col + step[1]) not in interior_tags:
                 adjacent_interior.append((row + step[0], col + step[1]))
         elif is_defender(board, row + step[0], col + step[1]):
@@ -715,12 +743,14 @@ def is_fort(board: np.array,
             return False
 
     for tile in adjacent_interior:
-        if not is_fort(board, tile, defender_tags, interior_tags):
+        if not is_fort(board, tile, defender_tags, interior_tags, piece_flags):
             return False
     return True
 
 
-def verify_encirclement(board: np.array) -> Tuple[list, list]:
+def verify_encirclement(board: np.array,
+                        piece_flags: np.array,
+                        ) -> Tuple[list, list]:
     """
     Return the "walls" of an encirclement.
 
@@ -732,6 +762,7 @@ def verify_encirclement(board: np.array) -> Tuple[list, list]:
     can't be escaped.
 
     :param np.array board: The 3D NumPy "board" array on which the game is being played.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: A tuple containing two lists, one list of the encircling attackers and one list of encircled tiles.
     """
 
@@ -753,7 +784,7 @@ def verify_encirclement(board: np.array) -> Tuple[list, list]:
             nr, nc = row + dr, col + dc
             if in_bounds(nr, nc, size) and (nr, nc) not in visited:
                 visited.add((nr, nc))
-                if is_defender(board, nr, nc) or is_blank(nr, nc, size):
+                if is_defender(board, nr, nc) or is_blank(nr, nc, size, piece_flags):
                     interior_tiles.append((nr, nc))
                     queue.append((nr, nc))
                 elif is_attacker(board, nr, nc):
@@ -807,11 +838,14 @@ def is_impenetrable(board: np.array,
     return True
 
 
-def check_encirclement(board: np.array) -> bool:
+def check_encirclement(board: np.array,
+                       piece_flags: np.array,
+                       ) -> bool:
     """
     Check whether the attackers have encircled all defenders.
 
     :param np.array board: The 3D NumPy 'board' array on which the game is being played.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if the attackers have encircled all defenders, otherwise False.
     """
     size = board.shape[1] - 1
@@ -847,18 +881,20 @@ def check_encirclement(board: np.array) -> bool:
                 visited.add((nr, nc))
                 if is_defender(board, nr, nc) or is_king(board, nr, nc):
                     return False
-                elif is_blank(nr, nc, size):
+                elif is_blank(nr, nc, size, piece_flags):
                     queue.append((nr, nc))
 
     return True
 
 
 def check_king(board: np.array,
+               piece_flags: np.array,
                ) -> int:
     """
     Check whether the King has escaped or been captured.
 
-    :param np.array board: A 2D NumPy array representing the board
+    :param np.array board: A 2D NumPy array representing the board.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: -1 means King captured, 1 means King escaped, 0 means neither.
     """
     size = board.shape[1] - 1
@@ -872,16 +908,16 @@ def check_king(board: np.array,
 
     # Is the king surrounded?
     if ((row - 1 > 0 and ((row - 1, col) == throne or
-                          (is_piece(row - 1, col) and
+                          (is_piece(row - 1, col, piece_flags) and
                            is_attacker(board, row - 1, col)))) and
         (row + 1 <= size and ((row + 1, col) == throne or
-                              (is_piece(row + 1, col) and
+                              (is_piece(row + 1, col, piece_flags) and
                                is_attacker(board, row + 1, col)))) and
         (col - 1 > 0 and ((row, col - 1) == throne or
-                          (is_piece(row, col - 1) and
+                          (is_piece(row, col - 1, piece_flags) and
                            is_attacker(board, row, col - 1)))) and
         (col + 1 <= size and ((row, col + 1) == throne or
-                              (is_piece(row, col + 1) and
+                              (is_piece(row, col + 1, piece_flags) and
                                is_attacker(board, row, col + 1))))
         ):
         return -1
@@ -893,6 +929,7 @@ def is_terminal(board: np.array,
                 dirty_map: dict,
                 dirty_flags: set,
                 player: str,
+                piece_flags: np.array,
                 attacker_moves: int = 1,
                 defender_moves: int = 1,
                 ):
@@ -904,11 +941,12 @@ def is_terminal(board: np.array,
     :param dict dirty_map: A dictionary mapping index i to a list of indices that will have invalidated caches if i moves.
     :param set dirty_flags: A set of (row, col) tuples that have invalid caches and need to be refreshed.
     :param str player: Either "defenders" or "attackers".
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :param int attacker_moves: The number of legal moves that the attackers had as of the latest check.
     :param int defender_moves: The number of legal moves that the attackers had as of the latest check.
     :return: "defenders" or "attackers" if either has won, otherwise None.
     """
-    king_state = check_king(board)
+    king_state = check_king(board, piece_flags)
     if king_state == 1:
         #print("King escaped.")
         return "defenders"
@@ -920,24 +958,24 @@ def is_terminal(board: np.array,
         defender_tags = []
         interior_tags = []
         if (is_edge(king_r, king_c, board.shape[1] - 1) and
-           is_fort(board, (king_r, king_c), defender_tags, interior_tags) and
+           is_fort(board, (king_r, king_c), defender_tags, interior_tags, piece_flags) and
            is_impenetrable(board, defender_tags, interior_tags)):
             #print("Defenders have built an Exit Fort.")
             return "defenders"
     elif player == "attackers":
-        if check_encirclement(board):
-            attacker_walls, visited = verify_encirclement(board)
+        if check_encirclement(board, piece_flags):
+            attacker_walls, visited = verify_encirclement(board, piece_flags)
             if is_impenetrable(board, attacker_walls, visited, option='encirclement'):
                 #print("Attackers have formed an encirclement.")
                 return "attackers"
     # Players already check their legal moves each turn, so this is a redundant (and expensive) operation.
     # Optimize this by just passing in the known number of legal moves. If it's zero, that player loses.
     if defender_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
-                                             dirty_flags=dirty_flags, player="defenders"):
+                                             dirty_flags=dirty_flags, player="defenders", piece_flags=piece_flags):
         #print("The defenders have no legal moves.")
         return "attackers"
     elif attacker_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
-                                               dirty_flags=dirty_flags, player="attackers"):
+                                               dirty_flags=dirty_flags, player="attackers", piece_flags=piece_flags):
         #print("The attackers have no legal moves.")
         return "defenders"
 

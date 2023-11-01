@@ -70,6 +70,7 @@ def simulate(board: np.array,
              dirty_map: dict,
              dirty_flags: set,
              player: str,
+             piece_flags: np.array,
              visualize: bool = False,  # This can be removed after dev and debugging is finished
              ):
     """Play through a random game on the given board until termination and return the result."""
@@ -86,7 +87,8 @@ def simulate(board: np.array,
     while True:
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
-        actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player)
+        actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
+                                  dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
         actions = np.argwhere(actions == 1)
 
         # Update the integer cache of legal moves for the current player.
@@ -98,23 +100,33 @@ def simulate(board: np.array,
         # Randomly select a legal move and make that move.
         choice = random.randint(0, len(actions) - 1)
         move, row, col = actions[choice]
-        new_index = make_move(board, (row, col), move, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)
+        new_index = make_move(board,
+                              (row, col),
+                              move,
+                              cache=cache,
+                              dirty_map=dirty_map,
+                              dirty_flags=dirty_flags,
+                              piece_flags=piece_flags)
 
         # Check for captures around the move
-        check_capture(board, new_index)
+        check_capture(board, new_index, piece_flags=piece_flags)
 
         # Check for termination
         terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player,
-                               attacker_moves=attacker_moves, defender_moves=defender_moves)
+                               attacker_moves=attacker_moves, defender_moves=defender_moves, piece_flags=piece_flags)
         if terminal:
             win = 1 if player == "defenders" else 0
             return i, win
         else:
             if (player == "defenders" and
-               quiescent_attacker(board=board)):
+               quiescent_attacker(board=board, piece_flags=piece_flags)):
                 return i, 0
             elif (player == "attackers" and
-                  quiescent_defender(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags)):
+                  quiescent_defender(board=board,
+                                     cache=cache,
+                                     dirty_map=dirty_map,
+                                     dirty_flags=dirty_flags,
+                                     piece_flags=piece_flags)):
                 return i, 1
             player = toggle_player(player)
 
