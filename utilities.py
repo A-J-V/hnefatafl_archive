@@ -212,7 +212,7 @@ def get_nice_variables(board: np.array,
     :return: A tuple containing several variables of use.
     """
     row, col = index
-    size = board.shape[-1] - 1
+    size = board.shape[1] - 1
     hostile = {(0, 0), (0, size), (size, 0), (size, size)}
     if board[0, index[0], index[1]] == 1:
         plane = 0
@@ -694,7 +694,7 @@ def is_fort(board: np.array,
     :return: True if a fort has been made, False otherwise. This does not guarantee that the fort is impenetrable.
     """
     row, col = index
-    size = board.shape[-1] - 1
+    size = board.shape[1] - 1
     interior_tags.append(index)
     adjacent_interior = []
 
@@ -735,7 +735,7 @@ def verify_encirclement(board: np.array) -> Tuple[list, list]:
     :return: A tuple containing two lists, one list of the encircling attackers and one list of encircled tiles.
     """
 
-    size = board.shape[-1] - 1
+    size = board.shape[1] - 1
     queue = deque()
     visited = set()
     attacker_walls = []
@@ -777,7 +777,7 @@ def is_impenetrable(board: np.array,
     :return: True if the fort/encirclement is impenetrable, False otherwise.
     """
 
-    size = board.shape[-1] - 1
+    size = board.shape[1] - 1
     if option == 'encirclement':
         is_wall = is_attacker
         is_safe = lambda r, c: (r, c) not in interior_tags
@@ -814,7 +814,7 @@ def check_encirclement(board: np.array) -> bool:
     :param np.array board: The 3D NumPy 'board' array on which the game is being played.
     :return: True if the attackers have encircled all defenders, otherwise False.
     """
-    size = board.shape[-1] - 1
+    size = board.shape[1] - 1
     queue = deque()
     visited = set()
 
@@ -853,43 +853,61 @@ def check_encirclement(board: np.array) -> bool:
     return True
 
 
-def check_king(board_array: np.array,
+def check_king(board: np.array,
                ) -> int:
     """
     Check whether the King has escaped or been captured.
 
-    :param np.array board_array: A 2D NumPy array representing the board
+    :param np.array board: A 2D NumPy array representing the board
     :return: -1 means King captured, 1 means King escaped, 0 means neither.
     """
-    size = board_array.shape[-1] - 1
-    row, col = tuple(np.argwhere(board_array[2, :, :] == 1)[0])
+    size = board.shape[1] - 1
+    row, col = find_king(board)
     corners = [(0, 0), (0, size), (size, 0), (size, size)]
     throne = (size // 2, size // 2)
-    is_hostile = lambda row, col: (row, col) == throne or (
-            board_array[:, row, col].any() and TEAMS[np.argwhere(board_array[:, row, col] == 1).item()] != 2)
 
     # Has the King escaped?
     if (row, col) in corners:
         return 1
 
     # Is the king surrounded?
-    if ((row - 1 > 0 and is_hostile(row - 1, col)) and
-            (row + 1 <= size and is_hostile(row + 1, col)) and
-            (col - 1 > 0 and is_hostile(row, col - 1)) and
-            (col + 1 <= size and is_hostile(row, col + 1))
-    ):
+    if ((row - 1 > 0 and ((row - 1, col) == throne or
+                          (is_piece(row - 1, col) and
+                           is_attacker(board, row - 1, col)))) and
+        (row + 1 <= size and ((row + 1, col) == throne or
+                              (is_piece(row + 1, col) and
+                               is_attacker(board, row + 1, col)))) and
+        (col - 1 > 0 and ((row, col - 1) == throne or
+                          (is_piece(row, col - 1) and
+                           is_attacker(board, row, col - 1)))) and
+        (col + 1 <= size and ((row, col + 1) == throne or
+                              (is_piece(row, col + 1) and
+                               is_attacker(board, row, col + 1))))
+        ):
         return -1
     return 0
 
 
-def is_terminal(board,
-                cache,
-                dirty_map,
-                dirty_flags,
-                player,
-                attacker_moves=1,
-                defender_moves=1,
+def is_terminal(board: np.array,
+                cache: np.array,
+                dirty_map: dict,
+                dirty_flags: set,
+                player: str,
+                attacker_moves: int = 1,
+                defender_moves: int = 1,
                 ):
+    """
+    Check for termination of the game using all pertinent mechanics.
+
+    :param np.array board: The 3D NumPy 'board' on which the game is being played.
+    :param np.array cache: The cache of legal moves for the pieces.
+    :param dict dirty_map: A dictionary mapping index i to a list of indices that will have invalidated caches if i moves.
+    :param set dirty_flags: A set of (row, col) tuples that have invalid caches and need to be refreshed.
+    :param str player: Either "defenders" or "attackers".
+    :param int attacker_moves: The number of legal moves that the attackers had as of the latest check.
+    :param int defender_moves: The number of legal moves that the attackers had as of the latest check.
+    :return: "defenders" or "attackers" if either has won, otherwise None.
+    """
     king_state = check_king(board)
     if king_state == 1:
         #print("King escaped.")
@@ -901,7 +919,7 @@ def is_terminal(board,
         king_r, king_c = find_king(board)
         defender_tags = []
         interior_tags = []
-        if (is_edge(king_r, king_c, board.shape[-1] - 1) and
+        if (is_edge(king_r, king_c, board.shape[1] - 1) and
            is_fort(board, (king_r, king_c), defender_tags, interior_tags) and
            is_impenetrable(board, defender_tags, interior_tags)):
             #print("Defenders have built an Exit Fort.")
