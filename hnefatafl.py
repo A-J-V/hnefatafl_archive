@@ -68,7 +68,7 @@ class TaflBoard:
 
         :param tuple index: A tuple (row, column) of the piece whose valid moves we're checking.
         """
-        moves = get_moves(self.board, index)
+        moves = get_moves(self.board, index, cache=self.cache, dirty_map=self.dirty_map, dirty_flags=self.dirty_flags)
         tmp = deepcopy(self.board)
         for k, instruction in enumerate([(0, -1), (0, 1), (1, -1), (1, 1)]):
             axis, direction = instruction

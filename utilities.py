@@ -492,7 +492,7 @@ def make_move(board: np.array,
     :param dirty_map: A dictionary mapping index value i to a list of indices j that would experience cache invalidation
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
-    :return:
+    :return: The new (row, col) tuple that the piece moved to from the old index.
     """
 
     # Find which plane the piece is on (which piece type it is)
