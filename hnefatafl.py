@@ -44,7 +44,6 @@ class TaflBoard:
         self.dirty_map = {(row, col): [] for (row, col) in product(list(range(self.shape)), list(range(self.shape)))}
         self.cache = np.zeros(shape=(40, self.shape, self.shape))
         self.piece_flags = np.sum(self.board, axis=0)
-        set_global_piece_flags(piece_flags=self.piece_flags)
         self.game_over = False
 
     def __repr__(self, board_array: np.array = None) -> str:

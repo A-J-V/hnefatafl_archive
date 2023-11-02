@@ -501,7 +501,7 @@ def make_move(board: np.array,
               piece_flags: np.array,
               ) -> tuple:
     """
-    Move the piece at index according to move. Assumes the move is legal.
+    Move the piece at index according to move.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param Tuple[int, int] index: The index of the piece to be moved.
@@ -531,6 +531,11 @@ def make_move(board: np.array,
     new_index = list(index)
     new_index[axis] += direction * num
     new_index = tuple(new_index)
+
+    # Ensure there isn't a piece already at the destination
+    if is_piece(new_index[0], new_index[1], piece_flags):
+        raise Exception(f"Tried move from {index[0]}, {index[1]} to {new_index[0]}, {new_index[1]}, but it's occupied.")
+
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 

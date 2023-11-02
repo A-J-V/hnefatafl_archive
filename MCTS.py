@@ -2,6 +2,7 @@ from utilities import *
 import random
 import graphics
 import time
+from copy import deepcopy
 
 
 class Node:
@@ -11,14 +12,18 @@ class Node:
                  dirty_map: dict,
                  dirty_flags: set,
                  player: str,
+                 piece_flags: np.array,
                  parent=None,
+                 spawning_action=None
                  ) -> None:
-        self.board = np.array(board)
-        self.cache = np.array(cache)
-        self.dirty_map = dirty_map.copy()
-        self.dirty_flags = dirty_flags.copy()
+        self.board = board
+        self.cache = cache
+        self.dirty_map = dirty_map
+        self.dirty_flags = dirty_flags
         self.player = player
+        self.piece_flags = piece_flags
         self.parent = parent
+        self.spawning_action = spawning_action
         self.children = []
         self.visits = 0
         self.value = 0
@@ -27,42 +32,143 @@ class Node:
                                   dirty_map=self.dirty_map,
                                   dirty_flags=self.dirty_flags,
                                   player=self.player,
+                                  piece_flags=self.piece_flags,
                                   )
         actions = np.argwhere(actions == 1)
         self.actions = [(move, row, col) for move, row, col in actions]
         random.shuffle(self.actions)
-
-    def best_child(self):
-        return max(self.children, key=lambda x: x.value / (x.visits if x.visits != 0 else 1))
-
-    def ucb1(self, c: float = 1.41):
-        """Calculate the UCB1 value using exploration factor c."""
-        return ((self.value / (self.visits if self.visits != 0 else 1)) +
-                c * (np.log(self.parent.visits) / (self.visits if self.visits != 0 else 1)) ** 0.5
-                )
+        self.winner = is_terminal(board=board,
+                                  cache=cache,
+                                  dirty_map=dirty_map,
+                                  dirty_flags=dirty_flags,
+                                  player=player,
+                                  piece_flags=piece_flags)
+        self.terminal = False if self.winner is None else True
+        self.is_fully_expanded = False
 
     def select_node(self):
         """Use the UCB1 formula to select a node"""
-        best = max(self.children, key=self.ucb1)
+        # If we only expand one child at a time, this needs to be modified so that we have a chance of expanding an
+        # unexplored child node.
+        best = max(self.children, key=ucb1)
         return best if best else None
 
-    def expand_node(self):
-        actions = all_legal_moves(board=self.board,
-                                  cache=self.cache,
-                                  dirty_map=self.dirty_map,
-                                  dirty_flags=self.dirty_flags,
-                                  player=self.player,
-                                  )
-        move, row, col = self.actions.pop()
-        new_state = np.array(self.board)
-        # Needs to be updated to reflect correct game mechanics
-        make_move(new_state, (row, col), move)
-        new_node = Node(new_state, player=toggle_player(self.player))
+    def expand_children(self):
+        #print("Inside expand_children()...")
+        for action in self.actions:
+            self.expand_node(action)
+        self.is_fully_expanded = True
+        return random.choice(self.children)
+
+    def expand_node(self, action):
+        # Make copies of the state that will become the child node's state
+        new_state = np.copy(self.board)
+        new_cache = np.copy(self.cache)
+        new_piece_flags = np.copy(self.piece_flags)
+        new_dirty_map = self.dirty_map.copy()
+        new_dirty_flags = self.dirty_flags.copy()
+
+        # Get action contents
+        move, row, col = action
+
+        # Update the new node's state by carrying out the selected move on the copied state
+        make_move(board=new_state,
+                  index=(row, col),
+                  move=move,
+                  cache=new_cache,
+                  dirty_map=new_dirty_map,
+                  dirty_flags=new_dirty_flags,
+                  piece_flags=new_piece_flags)
+
+        # Instantiate the new node with the acted on state and add it as a child node
+        new_node = Node(board=new_state,
+                        cache=new_cache,
+                        dirty_map=new_dirty_map,
+                        dirty_flags=new_dirty_flags,
+                        player=toggle_player(self.player),
+                        piece_flags=new_piece_flags,
+                        parent=self,
+                        spawning_action=action)
         self.children.append(new_node)
+
+    def backpropagate(self, result):
+        self.visits += 1
+        self.value += result
+        if self.parent:
+            self.parent.backpropagate(-result)
+
+
+class MCTS:
+    def __init__(self,
+                 board: np.array,
+                 cache: np.array,
+                 dirty_map: dict,
+                 dirty_flags: set,
+                 player: str,
+                 piece_flags: np.array,
+                 max_iter: int = 500):
+        """Setup for MCTS"""
+        self.caller = player
+        self.root_node = Node(board=board,
+                              cache=cache,
+                              dirty_map=dirty_map,
+                              dirty_flags=dirty_flags,
+                              player=player,
+                              piece_flags=piece_flags)
+        self.max_iter = max_iter
+        self.iteration = 0
+
+    def run(self):
+
+        while self.iteration < self.max_iter:
+            #print(f"Running iteration {self.iteration}...")
+            self.iterate()
+            self.iteration += 1
+
+        return max(self.root_node.children, key=lambda x: x.value).spawning_action
+
+    def iterate(self):
+
+        # 1) Selection
+        node = self.root_node
+        #print(f"node.terminal: {node.terminal}.")
+        #print(f"node.is_fully_expanded: {node.is_fully_expanded}.")
+        while not node.terminal and node.is_fully_expanded:
+            #print(f"Selecting node...")
+            node = node.select_node()
+
+        # 2) Expansion
+        if not node.terminal and not node.is_fully_expanded:
+            #print(f"Expanding children...")
+            node = node.expand_children()
+
+        # 3) Simulation
+        #print(f"Running simulation...")
+        result = simulate(board=node.board,
+                          cache=node.cache,
+                          dirty_map=node.dirty_map,
+                          dirty_flags=node.dirty_flags,
+                          player=node.player,
+                          piece_flags=node.piece_flags)
+        if result == self.caller:
+            result = 1
+        else:
+            result = -1
+
+        # 4) Backpropagation
+        #print("Backpropagating...")
+        node.backpropagate(result)
 
 
 def toggle_player(player):
     return "defenders" if player == "attackers" else "attackers"
+
+
+def ucb1(node, c: float = 1.41):
+    """Calculate the UCB1 value using exploration factor c."""
+    return ((node.value / (node.visits if node.visits != 0 else 1)) +
+            c * (np.log(node.parent.visits) / (node.visits if node.visits != 0 else 1)) ** 0.5
+            )
 
 
 def simulate(board: np.array,
@@ -78,13 +184,28 @@ def simulate(board: np.array,
         display = graphics.initialize()
         graphics.refresh(board, display)
 
-    # For debugging, record number of turns in the simulation i
-    i = 0
-
     # Add a simple integer cache of how many legal moves each player had last turn.
     attacker_moves = 100
     defender_moves = 100
     while True:
+
+        # Check for termination
+        terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
+                               player=player,
+                               attacker_moves=attacker_moves, defender_moves=defender_moves,
+                               piece_flags=piece_flags)
+        if terminal:
+            return terminal
+        elif (player == "attackers" and
+              quiescent_attacker(board=board, piece_flags=piece_flags)):
+            return "attackers"
+        elif (player == "defenders" and
+              quiescent_defender(board=board,
+                                 cache=cache,
+                                 dirty_map=dirty_map,
+                                 dirty_flags=dirty_flags,
+                                 piece_flags=piece_flags)):
+            return "defenders"
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
@@ -111,37 +232,9 @@ def simulate(board: np.array,
         # Check for captures around the move
         check_capture(board, new_index, piece_flags=piece_flags)
 
-        # Check for termination
-        terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags, player=player,
-                               attacker_moves=attacker_moves, defender_moves=defender_moves, piece_flags=piece_flags)
-        if terminal:
-            win = 1 if player == "defenders" else 0
-            return i, win
-        else:
-            if (player == "defenders" and
-               quiescent_attacker(board=board, piece_flags=piece_flags)):
-                return i, 0
-            elif (player == "attackers" and
-                  quiescent_defender(board=board,
-                                     cache=cache,
-                                     dirty_map=dirty_map,
-                                     dirty_flags=dirty_flags,
-                                     piece_flags=piece_flags)):
-                return i, 1
-            player = toggle_player(player)
+        # Flip the player for the next turn
+        player = toggle_player(player)
 
-        # For debugging
-        i += 1
         if visualize:
             graphics.refresh(board, display)
             time.sleep(1)
-
-
-class MCTS:
-
-    def __init__(self, initial_state: np.array, player, iterations):
-        """Setup for MCTS"""
-        self.root_node = Node(board=initial_state, player=player)
-        self.iterations = iterations
-
-
