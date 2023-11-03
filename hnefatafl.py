@@ -2,6 +2,7 @@ from copy import deepcopy
 import numpy as np
 from utilities import *
 from itertools import product
+from MCTS import Node
 
 # Store the initial map in a string
 starting_board = """\
@@ -17,6 +18,35 @@ A....D....A
 .....A.....
 ...AAAAA..."""
 
+
+def initialize_game(starting_board: str = starting_board) -> Node:
+    assert len(starting_board.replace('\n',
+                                      '')) ** 0.5 % 1 == 0, """The provided starting board
+                                               is not square. A Hnefatafl board must be square!"""
+    # Create three binary spatial planes, one plane for each piece type
+    a_plane = np.array([[1 if i == 'A' else 0 for i in list(c)] for c in starting_board.splitlines()])
+    d_plane = np.array([[1 if i == 'D' else 0 for i in list(c)] for c in starting_board.splitlines()])
+    k_plane = np.array([[1 if i == 'K' else 0 for i in list(c)] for c in starting_board.splitlines()])
+
+    # Stack the planes into an array, M x N x N, where N is board length/width and M is number of piece types
+    board = np.stack([a_plane, d_plane, k_plane])
+    shape = board.shape[-1]
+
+    # Define a set of dirty flags
+    dirty_flags = set(product(list(range(shape)), list(range(shape))))
+
+    # Define a dictionary mapping index i to a list of indices whose caches are invalidated when i moves
+    dirty_map = {(row, col): [] for (row, col) in product(list(range(shape)), list(range(shape)))}
+    cache = np.zeros(shape=(40, shape, shape))
+    piece_flags = np.sum(board, axis=0)
+
+    starting_node = Node(board=board,
+                         cache=cache,
+                         dirty_map=dirty_map,
+                         dirty_flags=dirty_flags,
+                         player='attackers',
+                         piece_flags=piece_flags)
+    return starting_node
 
 class TaflBoard:
     def __init__(self, starting_board: str = starting_board) -> None:

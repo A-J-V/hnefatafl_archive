@@ -6,6 +6,8 @@ from copy import deepcopy
 
 
 class Node:
+    node_count = 0
+
     def __init__(self,
                  board: np.array,
                  cache: np.array,
@@ -64,19 +66,29 @@ class Node:
 
     def select_node(self):
         """Use the UCB1 formula to select a node"""
-        # If we only expand one child at a time, this needs to be modified so that we have a chance of expanding an
-        # unexplored child node.
-        best = max(self.children, key=ucb1)
-        return best if best else None
+        best_i = 0
+        best_value = -float('inf')
+        best_child = None
+        for i, child in enumerate(self.children):
+            value = ucb1(child)
+            if value > best_value:
+                best_value = value
+                best_i = i
+                best_child = child
+        if isinstance(best_child, tuple):
+            best_child = self.expand_child(best_child)
+            self.children[best_i] = best_child
+        return best_child
 
     def expand_children(self):
-        #print("Inside expand_children()...")
         for action in self.actions:
-            self.expand_node(action)
+            self.lazy_expand_child(action)
         self.is_fully_expanded = True
-        return random.choice(self.children)
 
-    def expand_node(self, action):
+    def lazy_expand_child(self, action):
+        self.children.append(action)
+
+    def expand_child(self, action):
         # Instantiate the new node with the acted on state and add it as a child node
         new_node = Node(board=self.board,
                         cache=self.cache,
@@ -86,7 +98,19 @@ class Node:
                         piece_flags=self.piece_flags,
                         parent=self,
                         spawning_action=action)
-        self.children.append(new_node)
+        Node.node_count += 1
+        return new_node
+
+    def get_best_child(self):
+        max_visits = -1
+        best_child = None
+        for child in self.children:
+            if isinstance(child, tuple):
+                continue
+            else:
+                if child.visits > max_visits:
+                    best_child = child
+        return best_child
 
     def backpropagate(self, result):
         self.visits += 1
@@ -118,29 +142,29 @@ class MCTS:
     def run(self):
 
         while self.iteration < self.max_iter:
-            #print(f"Running iteration {self.iteration}...")
             self.iterate()
             self.iteration += 1
+        print(f"Total nodes instantiated: {Node.node_count}.")
+        expanded_children = sum([1 if not isinstance(child, tuple) else 0 for child in self.root_node.children])
+        print(f"Expanded number of children this turn: {expanded_children}")
 
-        return max(self.root_node.children, key=lambda x: x.visits).spawning_action
+        Node.node_count = 0
+        best_child = self.root_node.get_best_child()
+        return best_child
 
     def iterate(self):
 
         # 1) Selection
         node = self.root_node
-        #print(f"node.terminal: {node.terminal}.")
-        #print(f"node.is_fully_expanded: {node.is_fully_expanded}.")
         while not node.terminal and node.is_fully_expanded:
-            #print(f"Selecting node...")
             node = node.select_node()
 
         # 2) Expansion
         if not node.terminal and not node.is_fully_expanded:
-            #print(f"Expanding children...")
-            node = node.expand_children()
+            node.expand_children()
+            node = node.select_node()
 
         # 3) Simulation
-        #print(f"Running simulation...")
         result = simulate(board=np.array(node.board),
                           cache=np.array(node.cache),
                           dirty_map=node.dirty_map.copy(),
@@ -153,7 +177,6 @@ class MCTS:
             result = 0
 
         # 4) Backpropagation
-        #print("Backpropagating...")
         node.backpropagate(result)
 
 
@@ -161,8 +184,10 @@ def toggle_player(player):
     return "defenders" if player == "attackers" else "attackers"
 
 
-def ucb1(node, c: float = 1.5):
+def ucb1(node, c: float = 1):
     """Calculate the UCB1 value using exploration factor c."""
+    if isinstance(node, tuple) or node.visits == 0:
+        return float('inf')
     return ((node.value / (node.visits if node.visits != 0 else 1)) +
             c * (np.log(node.parent.visits) / (node.visits if node.visits != 0 else 1)) ** 0.5
             )
@@ -174,7 +199,7 @@ def simulate(board: np.array,
              dirty_flags: set,
              player: str,
              piece_flags: np.array,
-             visualize: bool = False,  # This can be removed after dev and debugging is finished
+             visualize: bool = False,
              ):
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
