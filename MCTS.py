@@ -32,13 +32,16 @@ class Node:
 
         if spawning_action:
             # Update the new node's state by carrying out the selected move on the copied state
-            make_move(board=self.board,
-                      index=(spawning_action[1], spawning_action[2]),
-                      move=spawning_action[0],
-                      cache=self.cache,
-                      dirty_map=self.dirty_map,
-                      dirty_flags=self.dirty_flags,
-                      piece_flags=self.piece_flags)
+            new_index = make_move(board=self.board,
+                                  index=(spawning_action[1], spawning_action[2]),
+                                  move=spawning_action[0],
+                                  cache=self.cache,
+                                  dirty_map=self.dirty_map,
+                                  dirty_flags=self.dirty_flags,
+                                  piece_flags=self.piece_flags)
+
+            # Check for captures around the move
+            check_capture(self.board, new_index, piece_flags=self.piece_flags)
 
         # Get the legal actions that can be done in this Node's state
         actions = all_legal_moves(board=self.board,

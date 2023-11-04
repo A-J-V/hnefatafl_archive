@@ -151,18 +151,23 @@ def is_ally(board: np.array, row: int, col: int, ally: int, piece_flags: np.arra
     return is_piece(row, col, piece_flags) and TEAMS[np.argwhere(board[:, row, col] == 1).item()] == ally
 
 
-def is_enemy(board: np.array, row: int, col: int, plane: int, piece_flags: np.array) -> bool:
+def is_enemy(board: np.array, row: int, col: int, ally: int, piece_flags: np.array) -> bool:
     """
     Return True if the piece at (row, col) is a non-King enemy according plane.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param int row: The row index.
     :param int col: The col index.
-    :param int plane: The piece plane. is_enemy checks for non-King "enemies" from the perspective of this plane.
+    :param int ally: The team of the piece checking for enemies.
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: True if the (row, col) contains a non-King enemy, False otherwise.
     """
-    return is_piece(row, col, piece_flags) and np.argwhere(board[:, row, col] == 1).item() not in [plane, 2]
+    if is_piece(row, col, piece_flags):
+        target_plane = np.argwhere(board[:, row, col] == 1).item()
+    else:
+        return False
+    return (TEAMS[target_plane] != ally and
+            target_plane != 2)
 
 
 def is_hostile(board: np.array, row: int, col: int, ally: int, hostile: List[tuple,], piece_flags: np.array) -> bool:
@@ -589,7 +594,7 @@ def check_capture(board: np.array,
         hostile.add((size // 2, size // 2))
 
     # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
-    if row > 0 and is_enemy(board, row - 1, col, plane, piece_flags):
+    if row > 0 and is_enemy(board, row - 1, col, ally, piece_flags):
         if is_edge(row - 1, col, size):
             tags = []
             if check_shield_wall(board, (row - 1, col), tags, piece_flags):
@@ -600,7 +605,7 @@ def check_capture(board: np.array,
             board[:, row - 1, col] = 0
             piece_flags[row - 1, col] = 0
 
-    if row < size and is_enemy(board, row + 1, col, plane, piece_flags):
+    if row < size and is_enemy(board, row + 1, col, ally, piece_flags):
         if is_edge(row + 1, col, size):
             tags = []
             if check_shield_wall(board, (row + 1, col), tags, piece_flags):
@@ -609,7 +614,7 @@ def check_capture(board: np.array,
             board[:, row + 1, col] = 0
             piece_flags[row + 1, col] = 0
 
-    if col > 0 and is_enemy(board, row, col - 1, plane, piece_flags):
+    if col > 0 and is_enemy(board, row, col - 1, ally, piece_flags):
         if is_edge(row, col - 1, size):
             tags = []
             if check_shield_wall(board, (row, col - 1), tags, piece_flags):
@@ -618,7 +623,7 @@ def check_capture(board: np.array,
             board[:, row, col - 1] = 0
             piece_flags[row, col - 1] = 0
 
-    if col < size and is_enemy(board, row, col + 1, plane, piece_flags):
+    if col < size and is_enemy(board, row, col + 1, ally, piece_flags):
         if is_edge(row, col + 1, size):
             tags = []
             if check_shield_wall(board, (row, col + 1), tags, piece_flags):
