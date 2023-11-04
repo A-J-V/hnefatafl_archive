@@ -49,8 +49,8 @@ class Node:
                                   piece_flags=self.piece_flags
                                   )
         actions = np.argwhere(actions == 1)
-        self.actions = [(move, row, col) for move, row, col in actions]
-        random.shuffle(self.actions)
+        # This isn't guaranteed to be a random order
+        self.actions = {(move, row, col) for move, row, col in actions}
 
         # Check whether this Node is terminal
         self.winner = is_terminal(board=self.board,
@@ -75,9 +75,6 @@ class Node:
                 best_value = value
                 best_i = i
                 best_child = child
-        if isinstance(best_child, tuple):
-            best_child = self.expand_child(best_child)
-            self.children[best_i] = best_child
         return best_child
 
     def expand_children(self):
@@ -88,8 +85,9 @@ class Node:
     def lazy_expand_child(self, action):
         self.children.append(action)
 
-    def expand_child(self, action):
+    def expand_child(self):
         # Instantiate the new node with the acted on state and add it as a child node
+        action = self.actions.pop()
         new_node = Node(board=self.board,
                         cache=self.cache,
                         dirty_map=self.dirty_map,
@@ -99,6 +97,9 @@ class Node:
                         parent=self,
                         spawning_action=action)
         Node.node_count += 1
+        self.children.append(new_node)
+        if not self.actions:
+            self.is_fully_expanded = True
         return new_node
 
     def get_best_child(self):
@@ -161,8 +162,7 @@ class MCTS:
 
         # 2) Expansion
         if not node.terminal and not node.is_fully_expanded:
-            node.expand_children()
-            node = node.select_node()
+            node = node.expand_child()
 
         # 3) Simulation
         result = simulate(board=np.array(node.board),
