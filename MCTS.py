@@ -2,7 +2,6 @@ from utilities import *
 import random
 import graphics
 import time
-from copy import deepcopy
 
 
 class Node:
@@ -31,7 +30,7 @@ class Node:
         self.value = 0
 
         if spawning_action:
-            # Update the new node's state by carrying out the selected move on the copied state
+            # Update the new node's state by carrying out the action that creates it
             new_index = make_move(board=self.board,
                                   index=(spawning_action[1], spawning_action[2]),
                                   move=spawning_action[0],
@@ -69,27 +68,19 @@ class Node:
 
     def select_node(self):
         """Use the UCB1 formula to select a node"""
-        best_i = 0
         best_value = -float('inf')
         best_child = None
-        for i, child in enumerate(self.children):
+        for child in self.children:
             value = ucb1(child)
             if value > best_value:
                 best_value = value
-                best_i = i
                 best_child = child
         return best_child
 
-    def expand_children(self):
-        for action in self.actions:
-            self.lazy_expand_child(action)
-        self.is_fully_expanded = True
-
-    def lazy_expand_child(self, action):
-        self.children.append(action)
-
     def expand_child(self):
-        # Instantiate the new node with the acted on state and add it as a child node
+        """Take an action from the Node's list of actions, and instantiate a new Node with that action."""
+
+        # Pop one of this Node's actions. Create a new Node, and pass in that action as the spawning action.
         action = self.actions.pop()
         new_node = Node(board=self.board,
                         cache=self.cache,
@@ -100,12 +91,17 @@ class Node:
                         parent=self,
                         spawning_action=action)
         Node.node_count += 1
+
+        # Append the new Node to the list of this Node's children.
         self.children.append(new_node)
+
+        # If that was the last unexplored action of this Node, set this Node as fully expanded.
         if not self.actions:
             self.is_fully_expanded = True
         return new_node
 
     def get_best_child(self):
+        """Return the 'best' child of this Node according to number of visits."""
         max_visits = -1
         best_child = None
         for child in self.children:
@@ -117,6 +113,7 @@ class Node:
         return best_child
 
     def backpropagate(self, result):
+        """Backpropagate the result of exploration up the game tree."""
         self.visits += 1
         self.value += result
         if self.parent:
@@ -132,7 +129,6 @@ class MCTS:
                  player: str,
                  piece_flags: np.array,
                  max_iter: int = 500):
-        """Setup for MCTS"""
         self.caller = player
         self.root_node = Node(board=board,
                               cache=cache,
@@ -144,7 +140,11 @@ class MCTS:
         self.iteration = 0
 
     def run(self):
+        """
+        Run MCTS to select a move to make.
 
+        :return: A Node object, which is the result of the 'best' move according to MCTS's results.
+        """
         while self.iteration < self.max_iter:
             self.iterate()
             self.iteration += 1
@@ -157,6 +157,7 @@ class MCTS:
         return best_child
 
     def iterate(self):
+        """Make a single iteration of MCTS, from selection through backpropagation."""
 
         # 1) Selection
         node = self.root_node
@@ -184,6 +185,7 @@ class MCTS:
 
 
 def toggle_player(player):
+    """Returns whichever player isn't the current player."""
     return "defenders" if player == "attackers" else "attackers"
 
 
