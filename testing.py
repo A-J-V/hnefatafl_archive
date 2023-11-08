@@ -434,4 +434,16 @@ def run_tests():
     assert not check_encirclement(b.board, piece_flags=b.piece_flags), \
         "Expected encirclement to be False, but it was True."
 
+    b = TaflBoard(tb['defender_losses_2'])
+    assert get_defender_losses(b.board) == 2, \
+        "Expected defenders to have lost 2, but they did not."
+
+    b = TaflBoard(tb['defender_losses_3'])
+    assert get_defender_losses(b.board) == 3, \
+        "Expected defenders to have lost 3, but they did not."
+
+    b = TaflBoard(tb['attacker_losses_3'])
+    assert get_attacker_losses(b.board) == 3, \
+        "Expected attackers to have lost 3, but they did not."
+
     print("All tests finished.")

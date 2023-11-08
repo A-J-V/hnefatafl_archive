@@ -225,6 +225,9 @@ def get_nice_variables(board: np.array,
     return row, col, TEAMS, size, hostile, plane, ally
 
 
+# The group of small convenience functions ends here
+
+# Heuristic functions for early termination begin here
 def quiescent_defender(board: np.array,
                        cache: np.array,
                        dirty_map: dict,
@@ -317,10 +320,24 @@ def quiescent_attacker(board: np.array, piece_flags: np.array) -> bool:
                         return True
                     else:
                         break
-        return False
+        return False\
+
+# Heuristic functions for early termination end here
+
+# Feature engineering functions begin here
 
 
-# The group of small convenience functions ends here
+def get_attacker_losses(board:np.array,
+                        starting_num: int = 24):
+    return starting_num - np.sum(board[0, :, :])
+
+
+def get_defender_losses(board:np.array,
+                        starting_num: int = 12):
+    return starting_num - np.sum(board[1, :, :])
+
+# Feature engineering functions end here
+
 
 
 def get_moves(board: np.array,
