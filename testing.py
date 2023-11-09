@@ -446,4 +446,16 @@ def run_tests():
     assert get_attacker_losses(b.board) == 3, \
         "Expected attackers to have lost 3, but they did not."
 
+    b = TaflBoard(tb['king_distance_5'])
+    assert get_king_distance_to_corner(b.board) == 5, \
+        "Expected King to be distance 5 from nearest corner, but he was not."
+
+    b = TaflBoard(tb['king_distance_6'])
+    assert get_king_distance_to_corner(b.board) == 6, \
+        "Expected King to be distance 6 from nearest corner, but he was not."
+
+    b = TaflBoard(tb['king_distance_7'])
+    assert get_king_distance_to_corner(b.board) == 7, \
+        "Expected King to be distance 7 from nearest corner, but he was not."
+
     print("All tests finished.")

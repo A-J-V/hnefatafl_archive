@@ -1,4 +1,5 @@
 from collections import deque
+import random
 # import cython
 import numpy as np
 # cimport numpy as np
@@ -327,17 +328,57 @@ def quiescent_attacker(board: np.array, piece_flags: np.array) -> bool:
 # Feature engineering functions begin here
 
 
-def get_attacker_losses(board:np.array,
+def get_attacker_losses(board: np.array,
                         starting_num: int = 24):
     return starting_num - np.sum(board[0, :, :])
 
 
-def get_defender_losses(board:np.array,
+def get_defender_losses(board: np.array,
                         starting_num: int = 12):
     return starting_num - np.sum(board[1, :, :])
 
-# Feature engineering functions end here
 
+def get_king_distance_to_corner(board: np.array) -> int:
+    """Return the King's Manhattan distance to the nearest corner.
+
+    :param np.array board: The board on which the game is being played.
+    :return: The integer representing the Manhattan distance from the King to the nearest corner.
+    """
+
+    king_loc = find_king(board=board)
+    size = board.shape[2] - 1
+    center = size // 2
+
+    # Check if King is closer to upper or bottom edge. Need to randomly break ties to avoid bias.
+    if king_loc[0] < center:
+        vertical = 'up'
+    elif king_loc[0] > center:
+        vertical = 'down'
+    else:
+        vertical = random.choice(['up', 'down'])
+
+    # Check if King is closer to left or right edge. Need to randomly break ties to avoid bias.
+    if king_loc[1] < center:
+        horizontal = 'left'
+    elif king_loc[1] > center:
+        horizontal = 'right'
+    else:
+        horizontal = random.choice(['left', 'right'])
+
+    # Return manhattan distance to nearest edge to the King.
+    if vertical == 'up' and horizontal == 'right':
+        return abs(king_loc[0] - 0) + abs(king_loc[1] - size)
+    elif vertical == 'up' and horizontal == 'left':
+        return abs(king_loc[0] - 0) + abs(king_loc[1] - 0)
+    elif vertical == 'down' and horizontal == 'right':
+        return abs(king_loc[0] - size) + abs(king_loc[1] - size)
+    elif vertical == 'down' and horizontal == 'left':
+        return abs(king_loc[0] - size) + abs(king_loc[1] - 0)
+    else:
+        raise Exception("Unexpectedly failed to calculate King's distance to corner.")
+
+
+# Feature engineering functions end here
 
 
 def get_moves(board: np.array,
