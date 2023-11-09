@@ -448,24 +448,65 @@ def get_escorts(board: np.array) -> int:
         if not in_bounds(row, col, size):
             escorts += 1
             continue
+
         while True:
             if not in_bounds(row, col, size):
                 break
+            # NOTE, technically if the defender is exactly 2 squares from the King, the King is not safe in that
+            # direction since an attacker could move between them without penalty.
             elif is_defender(board, row, col):
                 escorts += 1
                 break
             elif is_attacker(board, row, col):
                 break
-            elif is_edge(row, col, size):
-                break
             row += direction[0]
             col += direction[1]
-
     return escorts
 
 
+def get_attack_options(board: np.array,
+                       piece_flags: np.array) -> int:
+    """
+    Return the number of attackers who could move adjacent to the King at any given time. This loosely encodes
+    the number of options the attackers have in how they try to capture the King.
 
+    :param np.array board: The 3D NumPy "board" array on which the game is played.
+    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
+    :return: The number of attackers who could move adjacent to the King.
+    """
+    # Get the King's location and board size
+    king_loc = find_king(board)
+    size = board.shape[2] - 1
 
+    # Initialize number of attack options
+    attacks = 0
+
+    # The list of blank tiles next to the King that could be "attacked".
+    vulnerable_tiles = []
+
+    # Get the tiles adjacent to the King that are blank
+    for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        row, col = king_loc
+        row += direction[0]
+        col += direction[1]
+        if is_blank(row, col, size, piece_flags):
+            vulnerable_tiles.append((row, col))
+
+    for tile in vulnerable_tiles:
+        # For every direction, check for an attacker.
+        for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            row, col = tile
+            while True:
+                row += direction[0]
+                col += direction[1]
+                if not in_bounds(row, col, size):
+                    break
+                elif is_attacker(board, row, col):
+                    attacks += 1
+                    break
+                elif is_piece(row, col, piece_flags):
+                    break
+    return attacks
 
 
 # Feature engineering functions end here
