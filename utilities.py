@@ -338,6 +338,25 @@ def get_defender_losses(board: np.array,
     return starting_num - np.sum(board[1, :, :])
 
 
+def get_material_balance(board: np.array,
+                         attacker_starting_num: int = 24,
+                         defender_starting_num: int = 12,
+                         ) -> int:
+    """
+    Return the material balance from the perspective of the defenders.
+    In other words, if the defenders capture an attacker but haven't lost any pieces, material balance is 1.
+    If the attackers capture a defender but haven't lost any pieces, material balance is -1.
+
+    :param board:
+    :param attacker_starting_num:
+    :param defender_starting_num:
+    :return:
+    """
+    attacker_losses = get_attacker_losses(board, attacker_starting_num)
+    defender_losses = get_defender_losses(board, defender_starting_num)
+    return attacker_losses - defender_losses
+
+
 def get_king_distance_to_corner(board: np.array) -> int:
     """Return the King's Manhattan distance to the nearest corner.
 
@@ -396,6 +415,59 @@ def get_mobility(legal_moves: int,
         return 116 - legal_moves
     else:
         return 60 - legal_moves
+
+
+def get_escorts(board: np.array) -> int:
+    """
+    Returns the number of escorts the King has.
+
+    The King has four adjacent sides. An escort is defined as follows: if the King can move in a straight line and
+    bump into a defender, that direction is covered by an escort. The reasoning behind this is that if the King can
+    bump into a defender, then that logically means that any attacked who moves adjacent to the King on that side
+    could be immediately captured by moving the escorting defender and flanking the attacker between the defender
+    and the King. Therefore, this is a simple measure of King safety.
+
+    Note that to avoid penalizing the defenders for having the King on an edge, the edge's side is considered to be
+    escorted if the King is directly on the edge (because an attacker cannot attack from that direction).
+
+    :param board: The 3D NumPy "board" array on which the game is being played.
+    :return: The number of escorted sides. An integer from 0 to 4.
+    """
+    # Get the King's location and board size
+    king_loc = find_king(board)
+    size = board.shape[2] - 1
+
+    # Initialize number of escorts
+    escorts = 0
+
+    # For every direction, check for an escort.
+    for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        row, col = king_loc
+        row += direction[0]
+        col += direction[1]
+        if not in_bounds(row, col, size):
+            escorts += 1
+            continue
+        while True:
+            if not in_bounds(row, col, size):
+                break
+            elif is_defender(board, row, col):
+                escorts += 1
+                break
+            elif is_attacker(board, row, col):
+                break
+            elif is_edge(row, col, size):
+                break
+            row += direction[0]
+            col += direction[1]
+
+    return escorts
+
+
+
+
+
+
 # Feature engineering functions end here
 
 

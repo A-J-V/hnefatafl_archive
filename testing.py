@@ -458,4 +458,16 @@ def run_tests():
     assert get_king_distance_to_corner(b.board) == 7, \
         "Expected King to be distance 7 from nearest corner, but he was not."
 
+    b = TaflBoard(tb['escorts_none'])
+    assert get_escorts(b.board) == 0, \
+        "Expected King to have 0 escorts, but he did not."
+
+    b = TaflBoard(tb['escorts_1'])
+    assert get_escorts(b.board) == 1, \
+        "Expected King to have 1 escort, but he did not."
+
+    b = TaflBoard(tb['escorts_2'])
+    assert get_escorts(b.board) == 2, \
+        "Expected King to have 2 escorts, but he did not."
+
     print("All tests finished.")
