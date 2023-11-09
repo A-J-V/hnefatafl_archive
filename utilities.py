@@ -378,6 +378,24 @@ def get_king_distance_to_corner(board: np.array) -> int:
         raise Exception("Unexpectedly failed to calculate King's distance to corner.")
 
 
+def get_mobility(legal_moves: int,
+                 player: str) -> int:
+    """
+    Return the mobility of the player. This is player's starting moves - player's current moves.
+
+    This doesn't calculate legal moves since that is expensive and is already done each turn anyway. It should
+    be cached and passed to this function instead of calculated twice.
+
+    :param legal_moves: The number of legal moves the player has.
+    :param player: The player whose mobility we're checking. Either "defenders" or "attackers".
+    :return: The mobility value.
+    """
+
+    # This assumes the number of moves is for 11x11 Copenhagen Hnefatafl. It does not generalize.
+    if player == 'attackers':
+        return 116 - legal_moves
+    else:
+        return 60 - legal_moves
 # Feature engineering functions end here
 
 
