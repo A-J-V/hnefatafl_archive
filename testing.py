@@ -475,23 +475,23 @@ def run_tests():
         "Expected King to have 4 escorts, but he did not."
 
     b = TaflBoard(tb['attacks_0'])
-    assert get_attack_options(b.board, b.piece_flags) == 0, \
+    assert get_attack_options(b.board) == 0, \
         "Expected attackers to have 0 attacks, but they did not."
 
     b = TaflBoard(tb['attacks_1'])
-    assert get_attack_options(b.board, b.piece_flags) == 1, \
+    assert get_attack_options(b.board) == 1, \
         "Expected attackers to have 1 attack, but they did not."
 
     b = TaflBoard(tb['attacks_3'])
-    assert get_attack_options(b.board, b.piece_flags) == 3, \
+    assert get_attack_options(b.board) == 3, \
         "Expected attackers to have 3 attacks, but they did not."
 
     b = TaflBoard(tb['attacks_4'])
-    assert get_attack_options(b.board, b.piece_flags) == 4, \
+    assert get_attack_options(b.board) == 4, \
         "Expected attackers to have 4 attacks, but they did not."
 
     b = TaflBoard(tb['attacks_8'])
-    assert get_attack_options(b.board, b.piece_flags) == 8, \
+    assert get_attack_options(b.board) == 8, \
         "Expected attackers to have 8 attacks, but they did not."
 
     b = TaflBoard(tb['control_1'])
