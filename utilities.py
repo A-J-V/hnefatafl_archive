@@ -614,6 +614,32 @@ def get_close_defenders(board: np.array,
             close_defenders += 1
     return close_defenders
 
+
+def extract_features(board: np.array,
+                     defender_moves: int,
+                     attacker_moves: int,
+                     piece_flags: np.array,
+                     ) -> Tuple:
+    """
+
+    :param board:
+    :param defender_moves:
+    :param attacker_moves:
+    :param piece_flags:
+    :return:
+    """
+
+    material_balance = get_material_balance(board)
+    king_dist_to_corner = get_king_distance_to_corner(board)
+    attacker_mobility = get_mobility(attacker_moves, 'attackers')
+    defender_mobility = get_mobility(defender_moves, 'defenders')
+    mobility_delta = defender_mobility - attacker_mobility
+    escorts = get_escorts(board)
+    attack_options = get_attack_options(board, piece_flags)
+    map_control = get_map_control(board)
+    close_defenders = get_close_defenders(board)
+    return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders
+
 # Feature engineering functions end here
 
 
@@ -798,6 +824,7 @@ def make_move(board: np.array,
               dirty_map: dict,
               dirty_flags: set,
               piece_flags: np.array,
+              thin_move: bool = False,
               ) -> tuple:
     """
     Move the piece at index according to move.
@@ -810,6 +837,7 @@ def make_move(board: np.array,
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
+    :param bool thin_move: A boolean. If true, caches won't be updated. This is used for action evaluation.
     :return: The new (row, col) tuple that the piece moved to from the old index.
     """
 
@@ -838,32 +866,33 @@ def make_move(board: np.array,
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 
-    # Update piece_flags. This is a reference to the cache of piece locations.
-    piece_flags[index[0], index[1]] = 0
-    piece_flags[new_index[0], new_index[1]] = 1
+    if not thin_move:
+        # Update piece_flags. This is a reference to the cache of piece locations.
+        piece_flags[index[0], index[1]] = 0
+        piece_flags[new_index[0], new_index[1]] = 1
 
-    # Due to the move, we need to invalidate the cache of old and new location
-    dirty_flags.add(index)
-    dirty_flags.add(new_index)
+        # Due to the move, we need to invalidate the cache of old and new location
+        dirty_flags.add(index)
+        dirty_flags.add(new_index)
 
-    # Update the cache of the indices affected by the move from the old location
-    for affected_index in dirty_map[index]:
-        dirty_flags.add(affected_index)
+        # Update the cache of the indices affected by the move from the old location
+        for affected_index in dirty_map[index]:
+            dirty_flags.add(affected_index)
 
-    # Now update the cache and dirty map at the new location
-    # Note that the reason we're doing this here is that we refresh the dirty_map as a byproduct of
-    # get_moves(), and we need that to be able to set the dirty flags at the new location.
-    _ = get_moves(board,
-                  new_index,
-                  cache,
-                  dirty_map,
-                  dirty_flags,
-                  piece_flags
-                  )
+        # Now update the cache and dirty map at the new location
+        # Note that the reason we're doing this here is that we refresh the dirty_map as a byproduct of
+        # get_moves(), and we need that to be able to set the dirty flags at the new location.
+        _ = get_moves(board,
+                      new_index,
+                      cache,
+                      dirty_map,
+                      dirty_flags,
+                      piece_flags
+                      )
 
-    # Update the cache of the indices affected by the move to the new location
-    for affected_index in dirty_map[new_index]:
-        dirty_flags.add(affected_index)
+        # Update the cache of the indices affected by the move to the new location
+        for affected_index in dirty_map[new_index]:
+            dirty_flags.add(affected_index)
 
     return new_index
 
@@ -871,14 +900,16 @@ def make_move(board: np.array,
 def check_capture(board: np.array,
                   index: tuple,
                   piece_flags: np.array,
-                  ) -> None:
+                  thin_capture: bool = False,
+                  ) -> int:
     """
     Given an index, checks to see if any basic enemies pieces around it are captured.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
-    :return: None; if a piece can be captured, it will be automatically within this function.
+    :param bool thin_capture: A boolean. If true, captures will be counted, but not actually taken.
+    :return: Integer number of pieces captured.
     """
     # Set up some convenient variables
     row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
@@ -886,6 +917,8 @@ def check_capture(board: np.array,
     # If the throne is empty, it is hostile
     if not board[:, size // 2, size // 2].any():
         hostile.add((size // 2, size // 2))
+
+    captures = 0
 
     # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
     if row > 0 and is_enemy(board, row - 1, col, ally, piece_flags):
@@ -896,8 +929,10 @@ def check_capture(board: np.array,
         # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
         if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile, piece_flags):
             # Destroy it!
-            board[:, row - 1, col] = 0
-            piece_flags[row - 1, col] = 0
+            captures += 1
+            if not thin_capture:
+                board[:, row - 1, col] = 0
+                piece_flags[row - 1, col] = 0
 
     if row < size and is_enemy(board, row + 1, col, ally, piece_flags):
         if is_edge(row + 1, col, size):
@@ -905,8 +940,10 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row + 1, col), tags, piece_flags):
                 capture_tags(board, tags, piece_flags=piece_flags)
         if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile, piece_flags):
-            board[:, row + 1, col] = 0
-            piece_flags[row + 1, col] = 0
+            captures += 1
+            if not thin_capture:
+                board[:, row + 1, col] = 0
+                piece_flags[row + 1, col] = 0
 
     if col > 0 and is_enemy(board, row, col - 1, ally, piece_flags):
         if is_edge(row, col - 1, size):
@@ -914,8 +951,10 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row, col - 1), tags, piece_flags):
                 capture_tags(board, tags, piece_flags=piece_flags)
         if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile, piece_flags):
-            board[:, row, col - 1] = 0
-            piece_flags[row, col - 1] = 0
+            captures += 1
+            if not thin_capture:
+                board[:, row, col - 1] = 0
+                piece_flags[row, col - 1] = 0
 
     if col < size and is_enemy(board, row, col + 1, ally, piece_flags):
         if is_edge(row, col + 1, size):
@@ -923,8 +962,12 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row, col + 1), tags, piece_flags):
                 capture_tags(board, tags, piece_flags=piece_flags)
         if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile, piece_flags):
-            board[:, row, col + 1] = 0
-            piece_flags[row, col + 1] = 0
+            captures += 1
+            if not thin_capture:
+                board[:, row, col + 1] = 0
+                piece_flags[row, col + 1] = 0
+
+    return captures
 
 
 def capture_tags(board: np.array,
