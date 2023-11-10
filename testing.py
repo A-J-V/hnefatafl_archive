@@ -494,4 +494,12 @@ def run_tests():
     assert get_attack_options(b.board, b.piece_flags) == 8, \
         "Expected attackers to have 8 attacks, but they did not."
 
+    b = TaflBoard(tb['control_1'])
+    assert get_map_control(b.board) == 1, \
+        "Expected map control to be 1, but it was not."
+
+    b = TaflBoard(tb['control_minus2'])
+    assert get_map_control(b.board) == -2, \
+        "Expected map control to be -2, but it was not."
+
     print("All tests finished.")

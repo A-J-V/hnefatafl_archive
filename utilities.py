@@ -465,7 +465,8 @@ def get_escorts(board: np.array) -> int:
 
 
 def get_attack_options(board: np.array,
-                       piece_flags: np.array) -> int:
+                       piece_flags: np.array,
+                       ) -> int:
     """
     Return the number of attackers who could move adjacent to the King at any given time. This loosely encodes
     the number of options the attackers have in how they try to capture the King.
@@ -508,6 +509,84 @@ def get_attack_options(board: np.array,
                     break
     return attacks
 
+
+def get_map_control(board: np.array,
+                    ) -> int:
+    """
+    Returns the net "map control".
+
+    Map control is defined as the number of rows and columns controlled by a player. A player is defined to have
+    "control" over a row/column if the same player has the piece at the lowest and highest index of the row/column.
+    More intuitively, if the last pieces on the "ends" of any row and column belong to the same player, that player
+    controls the row/column.
+
+    The net map control is number of rows/columns controlled by defenders - the row/columns controlled by attackers.
+
+    The idea is that attackers want to have general, broad map control in order to encircle the defenders, and the
+    defenders want to have some map control to avoid this.
+
+    :param np.array board: The 3D NumPy "board" array on which the game is played.
+    :return: An integer representing the net map control.
+    """
+
+    size = board.shape[1]
+
+    # Initialize control to 0
+    defender_controlled = 0
+    attacker_controlled = 0
+
+    for row in range(size):
+        first = None
+        last = None
+        # Iterate low to high to find the first piece (if any)
+        for i in range(0, size, 1):
+            if is_attacker(board, row, i):
+                first = 'attacker'
+                break
+            elif is_defender(board, row, i):
+                first = 'defender'
+                break
+
+        for i in range(size - 1, 0, -1):
+            if is_attacker(board, row, i):
+                last = 'attacker'
+                break
+            elif is_defender(board, row, i):
+                last = 'defender'
+                break
+        if first and last and first is last:
+            if first == 'attacker':
+                attacker_controlled += 1
+            else:
+                defender_controlled += 1
+
+    for col in range(size):
+        first = None
+        last = None
+        # Iterate low to high to find the first piece (if any)
+        for i in range(0, size, 1):
+            if is_attacker(board, i, col):
+                first = 'attacker'
+                break
+            elif is_defender(board, i, col):
+                first = 'defender'
+                break
+
+        # Iterate high to low to find the last piece (if any)
+        for i in range(size - 1, 0, -1):
+            if is_attacker(board, i, col):
+                last = 'attacker'
+                break
+            elif is_defender(board, i, col):
+                last = 'defender'
+                break
+        if first and last and first == last:
+            if first == 'attacker':
+                attacker_controlled += 1
+            else:
+                defender_controlled += 1
+    net_control = defender_controlled - attacker_controlled
+    return net_control
 
 # Feature engineering functions end here
 
