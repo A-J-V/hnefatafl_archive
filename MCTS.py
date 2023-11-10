@@ -222,9 +222,11 @@ def simulate(board: np.array,
                                attacker_moves=attacker_moves, defender_moves=defender_moves,
                                piece_flags=piece_flags)
         if terminal:
+            print(f"{terminal} wins.")
             return terminal
         elif (player == "attackers" and
               quiescent_attacker(board=board, piece_flags=piece_flags)):
+            print("Attackers win (quiescent).")
             return "attackers"
         elif (player == "defenders" and
               quiescent_defender(board=board,
@@ -232,6 +234,7 @@ def simulate(board: np.array,
                                  dirty_map=dirty_map,
                                  dirty_flags=dirty_flags,
                                  piece_flags=piece_flags)):
+            print("Defenders win (quiescent).")
             return "defenders"
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
@@ -245,9 +248,59 @@ def simulate(board: np.array,
         else:
             defender_moves = len(actions)
 
-        # Randomly select a legal move and make that move.
-        choice = random.randint(0, len(actions) - 1)
-        move, row, col = actions[choice]
+        ### Move evaluation logic goes here.
+        action_scores = []
+        for move, row, col in actions:
+            # Make a thin move
+            new_index, old_index = make_move(board,
+                                             (row, col),
+                                             move,
+                                             cache=cache,
+                                             dirty_map=dirty_map,
+                                             dirty_flags=dirty_flags,
+                                             piece_flags=piece_flags,
+                                             thin_move=True)
+
+            # Check thin captures
+            captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
+
+            # Extract features
+            material_balance, king_dist_to_corner, escorts, \
+            attack_options, close_defenders, close_attackers = extract_features(board,
+                                                                                defender_moves=defender_moves,
+                                                                                attacker_moves=attacker_moves,
+                                                                                thin=True)
+
+            # Revert the temporary move
+            revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
+
+            # Adjust material count for captures
+            if player == 'defenders':
+                material_balance += captures
+            elif player == 'attackers':
+                material_balance -= captures
+
+            # Calculate the heuristic value score and assign it to this action
+            value = material_balance - king_dist_to_corner - 2 * close_attackers - 0.25 * attack_options + escorts
+            action_scores.append(value)
+
+
+        # Epsilon greedy move selection
+        if random.random() < 0.1:
+            # Randomly select a legal move and make that move.
+            choice = random.randint(0, len(actions) - 1)
+            move, row, col = actions[choice]
+        else:
+            if player == 'defenders':
+                choice = np.argmax(action_scores)
+            else:
+                choice = np.argmin(action_scores)
+            move, row, col = actions[choice]
+
+        # # Randomly select a legal move and make that move.
+        # choice = random.randint(0, len(actions) - 1)
+        # move, row, col = actions[choice]
+
         new_index = make_move(board,
                               (row, col),
                               move,
@@ -264,4 +317,4 @@ def simulate(board: np.array,
 
         if visualize:
             graphics.refresh(board, display)
-            time.sleep(1)
+            time.sleep(1.5)

@@ -503,7 +503,7 @@ def run_tests():
         "Expected map control to be -2, but it was not."
 
     b = TaflBoard(tb['close_defenders_3'])
-    assert get_close_defenders(b.board) == 3, \
+    assert get_close_pieces(b.board) == 3, \
         "Expected close defenders to be 3, but it was not."
 
     print("All tests finished.")

@@ -610,12 +610,14 @@ def get_map_control(board: np.array,
     return net_control
 
 
-def get_close_defenders(board: np.array,
-                        ) -> int:
+def get_close_pieces(board: np.array,
+                     pieces: str = 'defenders',
+                     ) -> int:
     """
     Count the defenders adjacent to the King.
 
     :param board:
+    :param pieces: Which pieces around the king are we looking for?
     :return: The number of defenders adjacent to the King.
     """
 
@@ -624,39 +626,48 @@ def get_close_defenders(board: np.array,
     size = board.shape[2] - 1
 
     # Initialize number of escorts
-    close_defenders = 0
+    close_pieces = 0
 
     # For every direction, check for an escort.
     for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
         row, col = king_loc
         row += direction[0]
         col += direction[1]
-        if in_bounds(row, col, size) and is_defender(board, row, col):
-            close_defenders += 1
-    return close_defenders
+        if pieces == 'defenders':
+            if in_bounds(row, col, size) and is_defender(board, row, col):
+                close_pieces += 1
+        else:
+            if in_bounds(row, col, size) and is_attacker(board, row, col):
+                close_pieces += 1
+    return close_pieces
 
 
 def extract_features(board: np.array,
                      defender_moves: int,
                      attacker_moves: int,
+                     thin: bool = False,
                      ) -> Tuple:
     """
     :param board:
     :param defender_moves:
     :param attacker_moves:
+    :param thin:
     :return:
     """
 
     material_balance = get_material_balance(board)
     king_dist_to_corner = get_king_distance_to_corner(board)
+    escorts = get_escorts(board)
+    attack_options = get_attack_options(board)
+    close_defenders = get_close_pieces(board, 'defenders')
+    close_attackers = get_close_pieces(board, 'attackers')
+    if thin:
+        return material_balance, king_dist_to_corner, escorts, attack_options, close_defenders, close_attackers
     attacker_mobility = get_mobility(attacker_moves, 'attackers')
     defender_mobility = get_mobility(defender_moves, 'defenders')
     mobility_delta = defender_mobility - attacker_mobility
-    escorts = get_escorts(board)
-    attack_options = get_attack_options(board)
     map_control = get_map_control(board)
-    close_defenders = get_close_defenders(board)
-    return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders
+    return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders, close_attackers
 
 # Feature engineering functions end here
 
@@ -855,7 +866,7 @@ def make_move(board: np.array,
                       if i moves, e.g. if i moves, the legal moves for every j need to be refreshed.
     :param dirty_flags: A set of tuples that need to have their legal move cache refreshed.
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
-    :param bool thin_move: A boolean. If true, caches won't be updated. This is used for action evaluation.
+    :param bool thin_move: A boolean. If true, caches won't be updated (except piece_flags). This is used for action evaluation.
     :return: The new (row, col) tuple that the piece moved to from the old index.
     """
 
@@ -884,10 +895,11 @@ def make_move(board: np.array,
     board[plane, new_index[0], new_index[1]] = 1
     board[plane, index[0], index[1]] = 0
 
+    # Update piece_flags. This is a reference to the cache of piece locations.
+    piece_flags[index[0], index[1]] = 0
+    piece_flags[new_index[0], new_index[1]] = 1
+
     if not thin_move:
-        # Update piece_flags. This is a reference to the cache of piece locations.
-        piece_flags[index[0], index[1]] = 0
-        piece_flags[new_index[0], new_index[1]] = 1
 
         # Due to the move, we need to invalidate the cache of old and new location
         dirty_flags.add(index)
@@ -916,6 +928,36 @@ def make_move(board: np.array,
         return new_index, index
 
     return new_index
+
+
+def revert_move(board: np.array,
+                new_index: Tuple[int, int],
+                old_index: Tuple[int, int],
+                piece_flags: np.array,
+                ) -> None:
+    """
+    Reverts a thin_move. This is used during move evaluation.
+
+    :param board:
+    :param new_index:
+    :param old_index:
+    :param piece_flags:
+    :return:
+    """
+
+    if board[0, new_index[0], new_index[1]] == 1:
+        plane = 0
+    elif board[1, new_index[0], new_index[1]] == 1:
+        plane = 1
+    else:
+        plane = 2
+
+    board[plane, old_index[0], old_index[1]] = 1
+    board[plane, new_index[0], new_index[1]] = 0
+
+    # Update piece_flags. This is a reference to the cache of piece locations.
+    piece_flags[old_index[0], old_index[1]] = 1
+    piece_flags[new_index[0], new_index[1]] = 0
 
 
 def check_capture(board: np.array,
