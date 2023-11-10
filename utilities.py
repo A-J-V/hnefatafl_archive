@@ -26,6 +26,17 @@ def is_piece(row: int,
     return piece_flags[row, col]
 
 
+def is_piece_thin(board: np.array,
+                  row,
+                  col,
+                  ) -> int:
+    """
+    Return 1 if a piece is located at (row, col), 0 otherwise.
+    This is a slower version of is_piece() that doesn't require a piece_flag cache. It's used in move evaluations.
+    """
+    return board[:, row, col].any()
+
+
 def is_king(board: np.array, row: int, col: int) -> bool:
     """
     Return True if the King is located at (row, col), False otherwise.
@@ -122,6 +133,18 @@ def is_blank(row: int, col: int, size: int, piece_flags: np.array) -> bool:
     :return: True if there is NO piece at (row, col), False otherwise.
     """
     return in_bounds(row, col, size) and not is_piece(row, col, piece_flags)
+
+
+def is_blank_thin(board: np.array,
+                  row: int,
+                  col: int,
+                  size: int,
+                  ) -> bool:
+    """
+    Returns True if (row, col) is blank, False otherwise.
+    This is a slower version of is_blank() that doesn't require a piece_flag cache. It's used for move evaluations.
+    """
+    return in_bounds(row, col, size) and not is_piece_thin(board, row, col)
 
 
 def near_blank(row: int, col: int, size: int, piece_flags: np.array) -> bool:
@@ -465,14 +488,12 @@ def get_escorts(board: np.array) -> int:
 
 
 def get_attack_options(board: np.array,
-                       piece_flags: np.array,
                        ) -> int:
     """
     Return the number of attackers who could move adjacent to the King at any given time. This loosely encodes
     the number of options the attackers have in how they try to capture the King.
 
     :param np.array board: The 3D NumPy "board" array on which the game is played.
-    :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :return: The number of attackers who could move adjacent to the King.
     """
     # Get the King's location and board size
@@ -490,7 +511,7 @@ def get_attack_options(board: np.array,
         row, col = king_loc
         row += direction[0]
         col += direction[1]
-        if is_blank(row, col, size, piece_flags):
+        if is_blank_thin(board, row, col, size):
             vulnerable_tiles.append((row, col))
 
     for tile in vulnerable_tiles:
@@ -505,7 +526,7 @@ def get_attack_options(board: np.array,
                 elif is_attacker(board, row, col):
                     attacks += 1
                     break
-                elif is_piece(row, col, piece_flags):
+                elif is_piece_thin(board, row, col):
                     break
     return attacks
 
@@ -618,14 +639,11 @@ def get_close_defenders(board: np.array,
 def extract_features(board: np.array,
                      defender_moves: int,
                      attacker_moves: int,
-                     piece_flags: np.array,
                      ) -> Tuple:
     """
-
     :param board:
     :param defender_moves:
     :param attacker_moves:
-    :param piece_flags:
     :return:
     """
 
@@ -635,7 +653,7 @@ def extract_features(board: np.array,
     defender_mobility = get_mobility(defender_moves, 'defenders')
     mobility_delta = defender_mobility - attacker_mobility
     escorts = get_escorts(board)
-    attack_options = get_attack_options(board, piece_flags)
+    attack_options = get_attack_options(board)
     map_control = get_map_control(board)
     close_defenders = get_close_defenders(board)
     return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders
@@ -893,6 +911,9 @@ def make_move(board: np.array,
         # Update the cache of the indices affected by the move to the new location
         for affected_index in dirty_map[new_index]:
             dirty_flags.add(affected_index)
+
+    if thin_move:
+        return new_index, index
 
     return new_index
 
