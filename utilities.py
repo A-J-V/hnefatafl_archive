@@ -588,6 +588,32 @@ def get_map_control(board: np.array,
     net_control = defender_controlled - attacker_controlled
     return net_control
 
+
+def get_close_defenders(board: np.array,
+                        ) -> int:
+    """
+    Count the defenders adjacent to the King.
+
+    :param board:
+    :return: The number of defenders adjacent to the King.
+    """
+
+    # Get the King's location and board size
+    king_loc = find_king(board)
+    size = board.shape[2] - 1
+
+    # Initialize number of escorts
+    close_defenders = 0
+
+    # For every direction, check for an escort.
+    for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        row, col = king_loc
+        row += direction[0]
+        col += direction[1]
+        if in_bounds(row, col, size) and is_defender(board, row, col):
+            close_defenders += 1
+    return close_defenders
+
 # Feature engineering functions end here
 
 
