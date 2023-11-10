@@ -198,6 +198,23 @@ def ucb1(node, c: float = 1):
             )
 
 
+def argmax(lst: list):
+    """
+    This is returns argmax with ties broken randomly.
+
+    :param lst: List of action scores.
+    :return: The argmax of the list of action scores with ties broken randomly.
+    """
+    if not lst:
+        raise Exception("argmax was passed an empty list.")
+    max_value = max(lst)
+    ties = []
+    for i, value in enumerate(lst):
+        if value == max_value:
+            ties.append(i)
+    return random.choice(ties)
+
+
 def simulate(board: np.array,
              cache: np.array,
              dirty_map: dict,
@@ -245,8 +262,14 @@ def simulate(board: np.array,
         # Update the integer cache of legal moves for the current player.
         if player == "attackers":
             attacker_moves = len(actions)
+            if attacker_moves == 0:
+                print("Attackers have no legal moves!")
+                return "defenders"
         else:
             defender_moves = len(actions)
+            if defender_moves == 0:
+                print("Defenders have no legal moves!")
+                return "attackers"
 
         ### Move evaluation logic goes here.
         action_scores = []
@@ -270,6 +293,7 @@ def simulate(board: np.array,
                                                                                 defender_moves=defender_moves,
                                                                                 attacker_moves=attacker_moves,
                                                                                 thin=True)
+            piece_vulnerable = is_vulnerable(board, new_index)
 
             # Revert the temporary move
             revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
@@ -281,7 +305,12 @@ def simulate(board: np.array,
                 material_balance -= captures
 
             # Calculate the heuristic value score and assign it to this action
-            value = material_balance - king_dist_to_corner - 2 * close_attackers - 0.25 * attack_options + escorts
+            king_boxed_in = 1 if close_defenders == 4 else 0
+            value = 1.5 * material_balance - king_dist_to_corner - 2 * close_attackers - 0.25 * attack_options + escorts
+            value -= king_boxed_in
+            if player == 'attackers':
+                value = value * -1
+            value -= 1.5 * piece_vulnerable
             action_scores.append(value)
 
 
@@ -291,10 +320,7 @@ def simulate(board: np.array,
             choice = random.randint(0, len(actions) - 1)
             move, row, col = actions[choice]
         else:
-            if player == 'defenders':
-                choice = np.argmax(action_scores)
-            else:
-                choice = np.argmin(action_scores)
+            choice = argmax(action_scores)
             move, row, col = actions[choice]
 
         # # Randomly select a legal move and make that move.

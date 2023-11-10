@@ -274,7 +274,6 @@ def is_vulnerable(board: np.array,
     :param index:
     :return:
     """
-
     plane = get_plane(board, index)
     if plane == 2:
         return 0
@@ -286,12 +285,12 @@ def is_vulnerable(board: np.array,
         row, col = index
         row += direction[0]
         col += direction[1]
-        if plane == 1 and is_attacker(board, row, col):
+        if in_bounds(row, col, size) and plane == 1 and is_attacker(board, row, col):
             row -= 2 * direction[0]
             col -= 2 * direction[1]
             if in_bounds(row, col, size) and is_blank_thin(board, row, col, size):
                 vulnerable_tiles.append((row, col))
-        elif plane == 0 and is_defender(board, row, col):
+        elif in_bounds(row, col, size) and plane == 0 and is_defender(board, row, col):
             row -= 2 * direction[0]
             col -= 2 * direction[1]
             if in_bounds(row, col, size) and is_blank_thin(board, row, col, size):
