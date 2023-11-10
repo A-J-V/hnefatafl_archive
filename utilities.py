@@ -239,14 +239,80 @@ def get_nice_variables(board: np.array,
     row, col = index
     size = board.shape[1] - 1
     hostile = {(0, 0), (0, size), (size, 0), (size, size)}
+    plane = get_plane(board, index)
+    ally = TEAMS[plane]
+    return row, col, TEAMS, size, hostile, plane, ally
+
+
+def get_plane(board: np.array,
+              index: tuple,
+              ) -> int:
+    """
+    Return the plane of index.
+
+    :param board: The 3D NumPy "board" array on which the game is being played.
+    :param index: The index whose plane we are checking.
+    :return: The plane of the index.
+    """
     if board[0, index[0], index[1]] == 1:
         plane = 0
     elif board[1, index[0], index[1]] == 1:
         plane = 1
     else:
         plane = 2
-    ally = TEAMS[plane]
-    return row, col, TEAMS, size, hostile, plane, ally
+    return plane
+
+
+def is_vulnerable(board: np.array,
+                  index: tuple,
+                  ) -> int:
+    """
+    Checks whether the piece at (row, col) could be captured by the enemy next turn.
+    This is used mainly in heuristic evaluation.
+
+    :param board:
+    :param index:
+    :return:
+    """
+
+    plane = get_plane(board, index)
+    if plane == 2:
+        return 0
+    size = board.shape[2] - 1
+
+    vulnerable_tiles = []
+    # For every direction, check for an enemy.
+    for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        row, col = index
+        row += direction[0]
+        col += direction[1]
+        if plane == 1 and is_attacker(board, row, col):
+            row -= 2 * direction[0]
+            col -= 2 * direction[1]
+            if in_bounds(row, col, size) and is_blank_thin(board, row, col, size):
+                vulnerable_tiles.append((row, col))
+        elif plane == 0 and is_defender(board, row, col):
+            row -= 2 * direction[0]
+            col -= 2 * direction[1]
+            if in_bounds(row, col, size) and is_blank_thin(board, row, col, size):
+                vulnerable_tiles.append((row, col))
+
+    for tile in vulnerable_tiles:
+        # For every direction, check for vulnerability.
+        for direction in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            row, col = tile
+            while True:
+                row += direction[0]
+                col += direction[1]
+                if not in_bounds(row, col, size):
+                    break
+                elif plane == 1 and is_attacker(board, row, col):
+                    return True
+                elif plane == 0 and is_defender(board, row, col):
+                    return True
+                elif is_piece_thin(board, row, col):
+                    break
+    return False
 
 
 # The group of small convenience functions ends here

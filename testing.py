@@ -506,4 +506,24 @@ def run_tests():
     assert get_close_pieces(b.board) == 3, \
         "Expected close defenders to be 3, but it was not."
 
+    b = TaflBoard(tb['not_vuln_4_4'])
+    assert is_vulnerable(b.board, (4, 4)) == 0, \
+        "Expected to be not vulnerable, but it was."
+
+    b = TaflBoard(tb['vuln_4_4'])
+    assert is_vulnerable(b.board, (4, 4)) == 1, \
+        "Expected to be vulnerable, but it was not."
+
+    b = TaflBoard(tb['not_vuln_5_4'])
+    assert is_vulnerable(b.board, (5, 4)) == 0, \
+        "Expected to be not vulnerable, but it was."
+
+    b = TaflBoard(tb['vuln_5_4'])
+    assert is_vulnerable(b.board, (5, 4)) == 1, \
+        "Expected to be vulnerable, but it was not."
+
+    b = TaflBoard(tb['not_vuln_4_0'])
+    assert is_vulnerable(b.board, (4, 0)) == 0, \
+        "Expected to be not vulnerable, but it was."
+
     print("All tests finished.")
