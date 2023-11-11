@@ -526,4 +526,24 @@ def run_tests():
     assert is_vulnerable(b.board, (4, 0)) == 0, \
         "Expected to be not vulnerable, but it was."
 
+    b = TaflBoard(tb['king_escape_1'])
+    assert king_can_escape(b.board, b.piece_flags) == 1, \
+        "Expected King to be able to escape, but he could not."
+
+    b = TaflBoard(tb['king_escape_2'])
+    assert king_can_escape(b.board, b.piece_flags) == 1, \
+        "Expected King to be able to escape, but he could not."
+
+    b = TaflBoard(tb['king_escape_3'])
+    assert king_can_escape(b.board, b.piece_flags) == 1, \
+        "Expected King to be able to escape, but he could not."
+
+    b = TaflBoard(tb['king_no_escape_1'])
+    assert king_can_escape(b.board, b.piece_flags) == 0, \
+        "Expected King to be unable to escape, but he could."
+
+    b = TaflBoard(tb['king_no_escape_2'])
+    assert king_can_escape(b.board, b.piece_flags) == 0, \
+        "Expected King to be unable to escape, but he could."
+
     print("All tests finished.")

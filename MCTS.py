@@ -2,6 +2,7 @@ from utilities import *
 import random
 import graphics
 import time
+import pandas as pd
 
 
 class Node:
@@ -222,11 +223,15 @@ def simulate(board: np.array,
              player: str,
              piece_flags: np.array,
              visualize: bool = False,
+             record: bool = False,
              ):
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
         display = graphics.initialize()
         graphics.refresh(board, display)
+
+    if record:
+        df = pd.DataFrame()
 
     # Add a simple integer cache of how many legal moves each player had last turn.
     attacker_moves = 100
@@ -271,7 +276,7 @@ def simulate(board: np.array,
                 print("Defenders have no legal moves!")
                 return "attackers"
 
-        ### Move evaluation logic goes here.
+        # Move evaluation logic goes here.
         action_scores = []
         for move, row, col in actions:
             # Make a thin move
@@ -288,11 +293,12 @@ def simulate(board: np.array,
             captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
 
             # Extract features
-            material_balance, king_dist_to_corner, escorts, \
-            attack_options, close_defenders, close_attackers = extract_features(board,
-                                                                                defender_moves=defender_moves,
-                                                                                attacker_moves=attacker_moves,
-                                                                                thin=True)
+            material_balance, king_dist_to_corner, mobility_delta, escorts, \
+            attack_options, map_control, close_defenders, close_attackers, king_escape = extract_features(board,
+                                                                                                          defender_moves=defender_moves,
+                                                                                                          attacker_moves=attacker_moves,
+                                                                                                          thin=False,
+                                                                                                          piece_flags=piece_flags)
             piece_vulnerable = is_vulnerable(board, new_index)
 
             # Revert the temporary move
@@ -306,13 +312,12 @@ def simulate(board: np.array,
 
             # Calculate the heuristic value score and assign it to this action
             king_boxed_in = 1 if close_defenders == 4 else 0
-            value = 1.5 * material_balance - king_dist_to_corner - 2 * close_attackers - 0.25 * attack_options + escorts
-            value -= king_boxed_in
+            value = 1.5 * material_balance - 2 * king_dist_to_corner - 1.5 * close_attackers - 0.25 * attack_options
+            value += escorts + 0.20 * map_control - king_boxed_in + 10 * king_escape
             if player == 'attackers':
                 value = value * -1
             value -= 1.5 * piece_vulnerable
             action_scores.append(value)
-
 
         # Epsilon greedy move selection
         if random.random() < 0.1:
@@ -343,4 +348,5 @@ def simulate(board: np.array,
 
         if visualize:
             graphics.refresh(board, display)
-            time.sleep(1.5)
+            time.sleep(1)
+

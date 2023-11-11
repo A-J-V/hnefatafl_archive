@@ -707,16 +707,69 @@ def get_close_pieces(board: np.array,
     return close_pieces
 
 
+def king_can_escape(board: np.array,
+                    piece_flags: np.array,
+                    ) -> int:
+    """
+
+    :param board:
+    :param piece_flags:
+    :return:
+    """
+
+    king_loc = find_king(board)
+    size = board.shape[2] - 1
+    if not is_edge(king_loc[0], king_loc[1], size):
+        return 0
+
+    elif king_loc[0] == 0 or king_loc[0] == size:
+        # King is on top/bottom edge, check if he can walk to left or right corner without hitting a piece
+        row, col = king_loc
+        while col > 0:
+            col -= 1
+            if not is_blank(row, col, size, piece_flags):
+                break
+            elif col == 0:
+                return 1
+        row, col = king_loc
+        while col < size:
+            col += 1
+            if not is_blank(row, col, size, piece_flags):
+                break
+            elif col == size:
+                return 1
+
+    elif king_loc[1] == 0 or king_loc[1] == size:
+        # King is on left/right edge, check if he can walk to left or right corner without hitting a piece
+        row, col = king_loc
+        while row > 0:
+            row -= 1
+            if not is_blank(row, col, size, piece_flags):
+                break
+            elif row == 0:
+                return 1
+        row, col = king_loc
+        while row < size:
+            row += 1
+            if not is_blank(row, col, size, piece_flags):
+                break
+            elif row == size:
+                return 1
+    return 0
+
+
 def extract_features(board: np.array,
                      defender_moves: int,
                      attacker_moves: int,
-                     thin: bool = False,
+                     thin: bool,
+                     piece_flags: np.array,
                      ) -> Tuple:
     """
     :param board:
     :param defender_moves:
     :param attacker_moves:
     :param thin:
+    :param piece_flags:
     :return:
     """
 
@@ -732,7 +785,8 @@ def extract_features(board: np.array,
     defender_mobility = get_mobility(defender_moves, 'defenders')
     mobility_delta = defender_mobility - attacker_mobility
     map_control = get_map_control(board)
-    return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders, close_attackers
+    king_escape = king_can_escape(board, piece_flags)
+    return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders, close_attackers, king_escape
 
 # Feature engineering functions end here
 
