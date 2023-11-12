@@ -230,26 +230,57 @@ def simulate(board: np.array,
         display = graphics.initialize()
         graphics.refresh(board, display)
 
-    if record:
-        df = pd.DataFrame()
+    df = pd.DataFrame(columns=['material_balance',
+                               'king_dist',
+                               'escorts',
+                               'attack_options',
+                               'close_defenders',
+                               'close_attackers',
+                               'mobility_delta',
+                               'map_control',
+                               'king_escape',
+                               'king_edge',
+                               'player',
+                               'turn_num',
+                               ])
 
     # Add a simple integer cache of how many legal moves each player had last turn.
     attacker_moves = 100
     defender_moves = 100
+    turn_num = 1
     while True:
 
+        if record:
+            # At start of turn, append the observation to the dataframe
+            obs = extract_features(board,
+                                   defender_moves=defender_moves,
+                                   attacker_moves=attacker_moves,
+                                   piece_flags=piece_flags)
+            obs['player'] = player
+            obs['turn_num'] = turn_num
+            df.loc[len(df)] = obs
+
         # Check for termination
-        terminal = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
-                               player=player,
-                               attacker_moves=attacker_moves, defender_moves=defender_moves,
-                               piece_flags=piece_flags)
-        if terminal:
+        terminal, reason = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
+                                       player=player,
+                                       attacker_moves=attacker_moves, defender_moves=defender_moves,
+                                       piece_flags=piece_flags)
+        if terminal != 'n/a':
             print(f"{terminal} wins.")
-            return terminal
+            if record:
+                df['final_turn'] = turn_num
+                df['victory_condition'] = reason
+                df['winner'] = terminal
+
+            return terminal, df
         elif (player == "attackers" and
               quiescent_attacker(board=board, piece_flags=piece_flags)):
             print("Attackers win (quiescent).")
-            return "attackers"
+            if record:
+                df['final_turn'] = turn_num
+                df['victory_condition'] = 'quiescent_attackers'
+                df['winner'] = 'attackers'
+            return "attackers", df
         elif (player == "defenders" and
               quiescent_defender(board=board,
                                  cache=cache,
@@ -257,7 +288,11 @@ def simulate(board: np.array,
                                  dirty_flags=dirty_flags,
                                  piece_flags=piece_flags)):
             print("Defenders win (quiescent).")
-            return "defenders"
+            if record:
+                df['final_turn'] = turn_num
+                df['victory_condition'] = 'quiescent_defenders'
+                df['winner'] = 'defenders'
+            return "defenders", df
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
@@ -269,12 +304,18 @@ def simulate(board: np.array,
             attacker_moves = len(actions)
             if attacker_moves == 0:
                 print("Attackers have no legal moves!")
-                return "defenders"
+                df['final_turn'] = turn_num
+                df['victory_condition'] = 'attackers_no_moves'
+                df['winner'] = 'defenders'
+                return "defenders", df
         else:
             defender_moves = len(actions)
             if defender_moves == 0:
                 print("Defenders have no legal moves!")
-                return "attackers"
+                df['final_turn'] = turn_num
+                df['victory_condition'] = 'defenders_no_moves'
+                df['winner'] = 'defenders'
+                return "attackers", df
 
         # Move evaluation logic goes here.
         action_scores = []
@@ -293,12 +334,10 @@ def simulate(board: np.array,
             captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
 
             # Extract features
-            material_balance, king_dist_to_corner, mobility_delta, escorts, \
-            attack_options, map_control, close_defenders, close_attackers, king_escape = extract_features(board,
-                                                                                                          defender_moves=defender_moves,
-                                                                                                          attacker_moves=attacker_moves,
-                                                                                                          thin=False,
-                                                                                                          piece_flags=piece_flags)
+            features = extract_features(board,
+                                        defender_moves=defender_moves,
+                                        attacker_moves=attacker_moves,
+                                        piece_flags=piece_flags)
             piece_vulnerable = is_vulnerable(board, new_index)
 
             # Revert the temporary move
@@ -306,21 +345,24 @@ def simulate(board: np.array,
 
             # Adjust material count for captures
             if player == 'defenders':
-                material_balance += captures
+                features['material_balance'] += captures
             elif player == 'attackers':
-                material_balance -= captures
+                features['material_balance'] -= captures
 
             # Calculate the heuristic value score and assign it to this action
-            king_boxed_in = 1 if close_defenders == 4 else 0
-            value = 1.5 * material_balance - 2 * king_dist_to_corner - 1.5 * close_attackers - 0.25 * attack_options
-            value += escorts + 0.20 * map_control - king_boxed_in + 10 * king_escape
+            king_boxed_in = 1 if features['close_defenders'] == 4 else 0
+            value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
+                     - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
+                     - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
+                     0.5 * features['king_edge'] * features['close_defenders'])
+
             if player == 'attackers':
                 value = value * -1
             value -= 1.5 * piece_vulnerable
             action_scores.append(value)
 
         # Epsilon greedy move selection
-        if random.random() < 0.1:
+        if random.random() < 0.2:
             # Randomly select a legal move and make that move.
             choice = random.randint(0, len(actions) - 1)
             move, row, col = actions[choice]
@@ -349,4 +391,4 @@ def simulate(board: np.array,
         if visualize:
             graphics.refresh(board, display)
             time.sleep(1)
-
+        turn_num += 1

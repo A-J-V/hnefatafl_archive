@@ -761,32 +761,41 @@ def king_can_escape(board: np.array,
 def extract_features(board: np.array,
                      defender_moves: int,
                      attacker_moves: int,
-                     thin: bool,
                      piece_flags: np.array,
-                     ) -> Tuple:
+                     ) -> dict:
     """
     :param board:
     :param defender_moves:
     :param attacker_moves:
-    :param thin:
     :param piece_flags:
     :return:
     """
-
+    size = board.shape[1] - 1
     material_balance = get_material_balance(board)
-    king_dist_to_corner = get_king_distance_to_corner(board)
+    king_dist = get_king_distance_to_corner(board)
     escorts = get_escorts(board)
     attack_options = get_attack_options(board)
     close_defenders = get_close_pieces(board, 'defenders')
     close_attackers = get_close_pieces(board, 'attackers')
-    if thin:
-        return material_balance, king_dist_to_corner, escorts, attack_options, close_defenders, close_attackers
     attacker_mobility = get_mobility(attacker_moves, 'attackers')
     defender_mobility = get_mobility(defender_moves, 'defenders')
     mobility_delta = defender_mobility - attacker_mobility
     map_control = get_map_control(board)
     king_escape = king_can_escape(board, piece_flags)
-    return material_balance, king_dist_to_corner, mobility_delta, escorts, attack_options, map_control, close_defenders, close_attackers, king_escape
+    king_loc = find_king(board)
+    king_edge = 1 if is_edge(king_loc[0], king_loc[1], size) else 0
+    payload = {'material_balance': material_balance,
+               'king_dist': king_dist,
+               'escorts': escorts,
+               'attack_options': attack_options,
+               'close_defenders': close_defenders,
+               'close_attackers': close_attackers,
+               'mobility_delta': mobility_delta,
+               'map_control': map_control,
+               'king_escape': king_escape,
+               'king_edge': king_edge
+               }
+    return payload
 
 # Feature engineering functions end here
 
@@ -1478,10 +1487,10 @@ def is_terminal(board: np.array,
     king_state = check_king(board, piece_flags)
     if king_state == 1:
         #print("King escaped.")
-        return "defenders"
+        return "defenders", "king_escaped"
     elif king_state == -1:
         #print("King captured.")
-        return "attackers"
+        return "attackers", "king_captured"
     elif player == "defenders":
         king_r, king_c = find_king(board)
         defender_tags = []
@@ -1490,24 +1499,24 @@ def is_terminal(board: np.array,
            is_fort(board, (king_r, king_c), defender_tags, interior_tags, piece_flags) and
            is_impenetrable(board, defender_tags, interior_tags)):
             #print("Defenders have built an Exit Fort.")
-            return "defenders"
+            return "defenders", "exit_fort"
     elif player == "attackers":
         if check_encirclement(board, piece_flags):
             attacker_walls, visited = verify_encirclement(board, piece_flags)
             if is_impenetrable(board, attacker_walls, visited, option='encirclement'):
                 #print("Attackers have formed an encirclement.")
-                return "attackers"
+                return "attackers", "encirclement"
     # Players already check their legal moves each turn, so this is a redundant (and expensive) operation.
     # Optimize this by just passing in the known number of legal moves. If it's zero, that player loses.
     if defender_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
                                              dirty_flags=dirty_flags, player="defenders", piece_flags=piece_flags):
         #print("The defenders have no legal moves.")
-        return "attackers"
+        return "attackers", "defenders_no_moves"
     elif attacker_moves < 10 and not has_moves(board=board, cache=cache, dirty_map=dirty_map,
                                                dirty_flags=dirty_flags, player="attackers", piece_flags=piece_flags):
         #print("The attackers have no legal moves.")
-        return "defenders"
+        return "defenders", "attackers_no_moves"
 
     # Does not check for draws
     else:
-        return None
+        return "n/a", "n/a"
