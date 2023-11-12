@@ -340,6 +340,18 @@ def simulate(board: np.array,
                                         piece_flags=piece_flags)
             piece_vulnerable = is_vulnerable(board, new_index)
 
+            term, _ = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
+                                           player=player,
+                                           attacker_moves=attacker_moves, defender_moves=defender_moves,
+                                           piece_flags=piece_flags)
+
+            if term == 'attackers':
+                term = - 1000
+            elif term == 'defenders':
+                term = 1000
+            else:
+                term = 0
+
             # Revert the temporary move
             revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
 
@@ -354,7 +366,7 @@ def simulate(board: np.array,
             value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
                      - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
                      - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
-                     0.5 * features['king_edge'] * features['close_defenders'])
+                     0.5 * features['king_edge'] * features['close_defenders'] + term)
 
             if player == 'attackers':
                 value = value * -1
@@ -369,10 +381,6 @@ def simulate(board: np.array,
         else:
             choice = argmax(action_scores)
             move, row, col = actions[choice]
-
-        # # Randomly select a legal move and make that move.
-        # choice = random.randint(0, len(actions) - 1)
-        # move, row, col = actions[choice]
 
         new_index = make_move(board,
                               (row, col),
