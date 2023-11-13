@@ -1,8 +1,11 @@
+import models
 from utilities import *
 import random
 import graphics
 import time
 import pandas as pd
+import torch
+from datetime import datetime
 
 
 class Node:
@@ -224,6 +227,7 @@ def simulate(board: np.array,
              piece_flags: np.array,
              visualize: bool = False,
              record: bool = False,
+             snapshot: bool = False,
              ):
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
@@ -248,6 +252,8 @@ def simulate(board: np.array,
     attacker_moves = 100
     defender_moves = 100
     turn_num = 1
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = models.load_baby_viking()
     while True:
 
         if record:
@@ -259,6 +265,13 @@ def simulate(board: np.array,
             obs['player'] = player
             obs['turn_num'] = turn_num
             df.loc[len(df)] = obs
+
+        if snapshot:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            file_name = f"./pending/snapshot_{timestamp}.pt"
+            tensor_state = torch.Tensor(board)
+            torch.save(tensor_state, file_name)
+
 
         # Check for termination
         terminal, reason = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
@@ -330,47 +343,49 @@ def simulate(board: np.array,
                                              piece_flags=piece_flags,
                                              thin_move=True)
 
-            # Check thin captures
-            captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
-
-            # Extract features
-            features = extract_features(board,
-                                        defender_moves=defender_moves,
-                                        attacker_moves=attacker_moves,
-                                        piece_flags=piece_flags)
-            piece_vulnerable = is_vulnerable(board, new_index)
-
-            term, _ = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
-                                           player=player,
-                                           attacker_moves=attacker_moves, defender_moves=defender_moves,
-                                           piece_flags=piece_flags)
-
-            if term == 'attackers':
-                term = - 1000
-            elif term == 'defenders':
-                term = 1000
-            else:
-                term = 0
-
+            # # Check thin captures
+            # captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
+            #
+            # # Extract features
+            # features = extract_features(board,
+            #                             defender_moves=defender_moves,
+            #                             attacker_moves=attacker_moves,
+            #                             piece_flags=piece_flags)
+            # piece_vulnerable = is_vulnerable(board, new_index)
+            #
+            # term, _ = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
+            #                                player=player,
+            #                                attacker_moves=attacker_moves, defender_moves=defender_moves,
+            #                                piece_flags=piece_flags)
+            #
+            # if term == 'attackers':
+            #     term = - 1000
+            # elif term == 'defenders':
+            #     term = 1000
+            # else:
+            #     term = 0
+            t_board = torch.Tensor(board).to(device).unsqueeze(0)
+            value = model(t_board)
             # Revert the temporary move
             revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
 
-            # Adjust material count for captures
-            if player == 'defenders':
-                features['material_balance'] += captures
-            elif player == 'attackers':
-                features['material_balance'] -= captures
+            # # Adjust material count for captures
+            # if player == 'defenders':
+            #     features['material_balance'] += captures
+            # elif player == 'attackers':
+            #     features['material_balance'] -= captures
+            #
+            # # Calculate the heuristic value score and assign it to this action
+            # king_boxed_in = 1 if features['close_defenders'] == 4 else 0
+            # value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
+            #          - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
+            #          - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
+            #          0.5 * features['king_edge'] * features['close_defenders'] + term)
+            #
+            # if player == 'attackers':
+            #     value = value * -1
+            # value -= 1.5 * piece_vulnerable
 
-            # Calculate the heuristic value score and assign it to this action
-            king_boxed_in = 1 if features['close_defenders'] == 4 else 0
-            value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
-                     - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
-                     - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
-                     0.5 * features['king_edge'] * features['close_defenders'] + term)
-
-            if player == 'attackers':
-                value = value * -1
-            value -= 1.5 * piece_vulnerable
             action_scores.append(value)
 
         # Epsilon greedy move selection
