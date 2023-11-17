@@ -24,6 +24,13 @@ def run_tests():
                        player="attackers", piece_flags=b.piece_flags)[0] == "attackers", \
         "Expected a terminal state, but found none."
 
+    b = TaflBoard(tb['instant_loss_surround_2'])
+    assert check_king(b.board, b.piece_flags) == -1, \
+        "Expected instant loss upon checking the King, because the King is surrounded by 4 enemies."
+    assert is_terminal(board=b.board, cache=b.cache, dirty_map=b.dirty_map, dirty_flags=b.dirty_flags,
+                       player="attackers", piece_flags=b.piece_flags)[0] == "attackers", \
+        "Expected a terminal state, but found none."
+
     # King is surrounded! This should result in immediate capture.
     b = TaflBoard(tb['instant_loss_throne'])
     assert check_king(b.board, b.piece_flags) == -1, \

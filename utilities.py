@@ -1438,26 +1438,19 @@ def check_king(board: np.array,
     size = board.shape[1] - 1
     row, col = find_king(board)
     corners = [(0, 0), (0, size), (size, 0), (size, size)]
-    throne = (size // 2, size // 2)
+    throne = [(size // 2, size // 2)]
+    hostile = corners + throne
 
     # Has the King escaped?
     if (row, col) in corners:
         return 1
 
     # Is the king surrounded?
-    if ((row - 1 > 0 and ((row - 1, col) == throne or
-                          (is_piece(row - 1, col, piece_flags) and
-                           is_attacker(board, row - 1, col)))) and
-        (row + 1 <= size and ((row + 1, col) == throne or
-                              (is_piece(row + 1, col, piece_flags) and
-                               is_attacker(board, row + 1, col)))) and
-        (col - 1 > 0 and ((row, col - 1) == throne or
-                          (is_piece(row, col - 1, piece_flags) and
-                           is_attacker(board, row, col - 1)))) and
-        (col + 1 <= size and ((row, col + 1) == throne or
-                              (is_piece(row, col + 1, piece_flags) and
-                               is_attacker(board, row, col + 1))))
-        ):
+    if ((in_bounds(row - 1, col, size) and (is_attacker(board, row - 1, col) or (row - 1, col) in hostile)) and
+        (in_bounds(row + 1, col, size) and (is_attacker(board, row + 1, col) or (row + 1, col) in hostile)) and
+        (in_bounds(row, col - 1, size) and (is_attacker(board, row, col - 1) or (row, col - 1) in hostile)) and
+        (in_bounds(row, col + 1, size) and (is_attacker(board, row, col + 1) or (row, col + 1) in hostile))
+       ):
         return -1
     return 0
 
