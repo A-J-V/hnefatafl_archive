@@ -4,6 +4,11 @@ import pygame
 
 WIN_SIZE = 1024
 TILE_SIZE = 110
+RED_HIGHLIGHT = (240, 50, 50, 100)
+BLUE_HIGHLIGHT = (50, 50, 240, 100)
+RED_TILE = None
+BLUE_TILE = None
+
 BLK = (0, 0, 0)
 BGCOLOR = BLK
 board_image = pygame.image.load('./assets/hnefatafl_board.png')
@@ -27,23 +32,41 @@ def initialize():
     main_display.fill(BGCOLOR)
     rect = main_display.get_rect()
     main_display.blit(board_image, rect)
+    global RED_TILE
+    global BLUE_TILE
+    RED_TILE = (pygame.Surface((TILE_SIZE//1.7, TILE_SIZE//1.7)).convert_alpha())
+    RED_TILE.fill(RED_HIGHLIGHT)
+    BLUE_TILE = pygame.Surface((TILE_SIZE//1.7, TILE_SIZE//1.7)).convert_alpha()
+    BLUE_TILE.fill(BLUE_HIGHLIGHT)
     return main_display
 
 
-def refresh(board: np.array, display: pygame.surface):
+def refresh(board: np.array,
+            display: pygame.surface,
+            piece_flags: np.array,
+            ):
     display_rect = display.get_rect()
     display.blit(board_image, display_rect)
     for i, row in enumerate(range(board.shape[1])):
         for j, col in enumerate(range(board.shape[2])):
-            for k, plane in enumerate(range(board.shape[0])):
-                if not board[k, i, j].any():
-                    continue
+            if piece_flags[i, j] != 1:
+                cc = 134
+                rc = 135
+                piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
+                display.blit(BLUE_TILE, piece_rect)
+            else:
+                if board[0, i, j] == 1:
+                    plane = 0
+                elif board[1, i, j] == 1:
+                    plane = 1
                 else:
-                    cc = 112 - 15 * (plane == 2)
-                    rc = 90 - 30 * (plane == 2)
-                    piece_sprite = plane_to_img[k]
-                    piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
-                    display.blit(piece_sprite, piece_rect)
+                    plane = 2
+                cc = 112 - 15 * (plane == 2)
+                rc = 90 - 30 * (plane == 2)
+                piece_sprite = plane_to_img[plane]
+                piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
+                display.blit(RED_TILE, pygame.Rect((col * 68 + 134, row * 65 + 135, TILE_SIZE, TILE_SIZE)))
+                display.blit(piece_sprite, piece_rect)
     pygame.display.update()
 
 

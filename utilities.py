@@ -1479,10 +1479,10 @@ def is_terminal(board: np.array,
     """
     king_state = check_king(board, piece_flags)
     if king_state == 1:
-        #print("King escaped.")
+        print("King escape detected.")
         return "defenders", "king_escaped"
     elif king_state == -1:
-        #print("King captured.")
+        print("King capture detected.")
         return "attackers", "king_captured"
     elif player == "defenders":
         king_r, king_c = find_king(board)
@@ -1491,13 +1491,13 @@ def is_terminal(board: np.array,
         if (is_edge(king_r, king_c, board.shape[1] - 1) and
            is_fort(board, (king_r, king_c), defender_tags, interior_tags, piece_flags) and
            is_impenetrable(board, defender_tags, interior_tags)):
-            #print("Defenders have built an Exit Fort.")
+            print("Exit Fort detected.")
             return "defenders", "exit_fort"
     elif player == "attackers":
         if check_encirclement(board, piece_flags):
             attacker_walls, visited = verify_encirclement(board, piece_flags)
             if is_impenetrable(board, attacker_walls, visited, option='encirclement'):
-                #print("Attackers have formed an encirclement.")
+                print("Encirclement detected.")
                 return "attackers", "encirclement"
     # Players already check their legal moves each turn, so this is a redundant (and expensive) operation.
     # Optimize this by just passing in the known number of legal moves. If it's zero, that player loses.

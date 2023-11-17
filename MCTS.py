@@ -232,7 +232,7 @@ def simulate(board: np.array,
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
         display = graphics.initialize()
-        graphics.refresh(board, display)
+        graphics.refresh(board, display, piece_flags)
 
     df = pd.DataFrame(columns=['material_balance',
                                'king_dist',
@@ -252,8 +252,18 @@ def simulate(board: np.array,
     attacker_moves = 100
     defender_moves = 100
     turn_num = 1
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = models.load_baby_viking()
+    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # model = models.load_baby_viking()
+    #
+    # board_size = 11
+    # special_tiles = torch.zeros((1, board_size, board_size))
+    # # Mark corners and center (adjust indices based on your board layout)
+    # corner_indices = [0, board_size - 1]
+    # for i in corner_indices:
+    #     for j in corner_indices:
+    #         special_tiles[0, i, j] = 1
+    # special_tiles[0, board_size // 2, board_size // 2] = -1  # Center tile
+    # special_tiles = special_tiles.to(device).unsqueeze(0)
     while True:
 
         if record:
@@ -279,33 +289,33 @@ def simulate(board: np.array,
                                        attacker_moves=attacker_moves, defender_moves=defender_moves,
                                        piece_flags=piece_flags)
         if terminal != 'n/a':
-            print(f"{terminal} wins.")
+            print(f"{terminal} wins because {reason}.")
             if record:
                 df['final_turn'] = turn_num
                 df['victory_condition'] = reason
                 df['winner'] = terminal
 
             return terminal, df
-        elif (player == "attackers" and
-              quiescent_attacker(board=board, piece_flags=piece_flags)):
-            print("Attackers win (quiescent).")
-            if record:
-                df['final_turn'] = turn_num
-                df['victory_condition'] = 'quiescent_attackers'
-                df['winner'] = 'attackers'
-            return "attackers", df
-        elif (player == "defenders" and
-              quiescent_defender(board=board,
-                                 cache=cache,
-                                 dirty_map=dirty_map,
-                                 dirty_flags=dirty_flags,
-                                 piece_flags=piece_flags)):
-            print("Defenders win (quiescent).")
-            if record:
-                df['final_turn'] = turn_num
-                df['victory_condition'] = 'quiescent_defenders'
-                df['winner'] = 'defenders'
-            return "defenders", df
+        # elif (player == "attackers" and
+        #       quiescent_attacker(board=board, piece_flags=piece_flags)):
+        #     print("Attackers win (quiescent).")
+        #     if record:
+        #         df['final_turn'] = turn_num
+        #         df['victory_condition'] = 'quiescent_attackers'
+        #         df['winner'] = 'attackers'
+        #     return "attackers", df
+        # elif (player == "defenders" and
+        #       quiescent_defender(board=board,
+        #                          cache=cache,
+        #                          dirty_map=dirty_map,
+        #                          dirty_flags=dirty_flags,
+        #                          piece_flags=piece_flags)):
+        #     print("Defenders win (quiescent).")
+        #     if record:
+        #         df['final_turn'] = turn_num
+        #         df['victory_condition'] = 'quiescent_defenders'
+        #         df['winner'] = 'defenders'
+        #     return "defenders", df
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
@@ -323,6 +333,7 @@ def simulate(board: np.array,
                 return "defenders", df
         else:
             defender_moves = len(actions)
+            print(f'Defenders have {defender_moves} moves.')
             if defender_moves == 0:
                 print("Defenders have no legal moves!")
                 df['final_turn'] = turn_num
@@ -343,53 +354,32 @@ def simulate(board: np.array,
                                              piece_flags=piece_flags,
                                              thin_move=True)
 
-            # # Check thin captures
-            # captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
-            #
-            # # Extract features
-            # features = extract_features(board,
-            #                             defender_moves=defender_moves,
-            #                             attacker_moves=attacker_moves,
-            #                             piece_flags=piece_flags)
-            # piece_vulnerable = is_vulnerable(board, new_index)
-            #
-            # term, _ = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
-            #                                player=player,
-            #                                attacker_moves=attacker_moves, defender_moves=defender_moves,
-            #                                piece_flags=piece_flags)
-            #
-            # if term == 'attackers':
-            #     term = - 1000
-            # elif term == 'defenders':
-            #     term = 1000
-            # else:
-            #     term = 0
-            t_board = torch.Tensor(board).to(device).unsqueeze(0)
-            value = model(t_board)
+            # Neural Net Evaluation
+            # t_board = torch.Tensor(board).to(device).unsqueeze(0)
+            # t_board = torch.cat((t_board, special_tiles), dim=1)
+            # value = model(t_board)
+            # if player == 'attackers':
+            #    value = 1 - value
+
+            # Heuristic Evaluation
+            value = heuristic_evaluation(board=board,
+                                         cache=cache,
+                                         dirty_map=dirty_map,
+                                         dirty_flags=dirty_flags,
+                                         player=player,
+                                         defender_moves=defender_moves,
+                                         attacker_moves=attacker_moves,
+                                         piece_flags=piece_flags,
+                                         new_index=new_index
+                                         )
+
             # Revert the temporary move
             revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
-
-            # # Adjust material count for captures
-            # if player == 'defenders':
-            #     features['material_balance'] += captures
-            # elif player == 'attackers':
-            #     features['material_balance'] -= captures
-            #
-            # # Calculate the heuristic value score and assign it to this action
-            # king_boxed_in = 1 if features['close_defenders'] == 4 else 0
-            # value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
-            #          - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
-            #          - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
-            #          0.5 * features['king_edge'] * features['close_defenders'] + term)
-            #
-            # if player == 'attackers':
-            #     value = value * -1
-            # value -= 1.5 * piece_vulnerable
 
             action_scores.append(value)
 
         # Epsilon greedy move selection
-        if random.random() < 0.2:
+        if random.random() < 0.00:
             # Randomly select a legal move and make that move.
             choice = random.randint(0, len(actions) - 1)
             move, row, col = actions[choice]
@@ -412,6 +402,57 @@ def simulate(board: np.array,
         player = toggle_player(player)
 
         if visualize:
-            graphics.refresh(board, display)
+            graphics.refresh(board, display, piece_flags)
             time.sleep(1)
         turn_num += 1
+
+
+def heuristic_evaluation(board,
+                         cache,
+                         dirty_map,
+                         dirty_flags,
+                         player,
+                         defender_moves,
+                         attacker_moves,
+                         piece_flags,
+                         new_index,
+                         ):
+    # Check thin captures
+    captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
+
+    # Extract features
+    features = extract_features(board,
+                                defender_moves=defender_moves,
+                                attacker_moves=attacker_moves,
+                                piece_flags=piece_flags)
+    piece_vulnerable = is_vulnerable(board, new_index)
+
+    term, _ = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
+                          player=player,
+                          attacker_moves=attacker_moves, defender_moves=defender_moves,
+                          piece_flags=piece_flags)
+
+    if term == 'attackers':
+        term = - 1000
+    elif term == 'defenders':
+        term = 1000
+    else:
+        term = 0
+
+    # Adjust material count for captures
+    if player == 'defenders':
+        features['material_balance'] += captures
+    elif player == 'attackers':
+        features['material_balance'] -= captures
+
+    # Calculate the heuristic value score and assign it to this action
+    king_boxed_in = 1 if features['close_defenders'] == 4 else 0
+    value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
+             - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
+             - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
+             0.5 * features['king_edge'] * features['close_defenders'] + term)
+
+    if player == 'attackers':
+        value = value * -1
+    value -= 1.5 * piece_vulnerable
+    return value
