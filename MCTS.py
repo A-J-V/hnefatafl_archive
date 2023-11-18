@@ -228,11 +228,12 @@ def simulate(board: np.array,
              visualize: bool = False,
              record: bool = False,
              snapshot: bool = False,
+             show_cache: bool = False,
              ):
     """Play through a random game on the given board until termination and return the result."""
     if visualize:
         display = graphics.initialize()
-        graphics.refresh(board, display, piece_flags)
+        graphics.refresh(board, display, piece_flags, show_cache)
 
     df = pd.DataFrame(columns=['material_balance',
                                'king_dist',
@@ -333,7 +334,6 @@ def simulate(board: np.array,
                 return "defenders", df
         else:
             defender_moves = len(actions)
-            print(f'Defenders have {defender_moves} moves.')
             if defender_moves == 0:
                 print("Defenders have no legal moves!")
                 df['final_turn'] = turn_num
@@ -379,12 +379,13 @@ def simulate(board: np.array,
             action_scores.append(value)
 
         # Epsilon greedy move selection
-        if random.random() < 0.00:
+        if random.random() < 0.10:
             # Randomly select a legal move and make that move.
             choice = random.randint(0, len(actions) - 1)
             move, row, col = actions[choice]
         else:
             choice = argmax(action_scores)
+            #print(f"This move of {player} is evaluated as {max(action_scores)}.")
             move, row, col = actions[choice]
 
         new_index = make_move(board,
@@ -402,8 +403,8 @@ def simulate(board: np.array,
         player = toggle_player(player)
 
         if visualize:
-            graphics.refresh(board, display, piece_flags)
-            time.sleep(1)
+            graphics.refresh(board, display, piece_flags, show_cache)
+            time.sleep(0.3)
         turn_num += 1
 
 

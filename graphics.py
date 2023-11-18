@@ -44,16 +44,18 @@ def initialize():
 def refresh(board: np.array,
             display: pygame.surface,
             piece_flags: np.array,
+            show_cache: bool = False,
             ):
     display_rect = display.get_rect()
     display.blit(board_image, display_rect)
     for i, row in enumerate(range(board.shape[1])):
         for j, col in enumerate(range(board.shape[2])):
             if piece_flags[i, j] != 1:
-                cc = 134
-                rc = 135
-                piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
-                display.blit(BLUE_TILE, piece_rect)
+                if show_cache:
+                    cc = 134
+                    rc = 135
+                    piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
+                    display.blit(BLUE_TILE, piece_rect)
             else:
                 if board[0, i, j] == 1:
                     plane = 0
@@ -65,7 +67,8 @@ def refresh(board: np.array,
                 rc = 90 - 30 * (plane == 2)
                 piece_sprite = plane_to_img[plane]
                 piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
-                display.blit(RED_TILE, pygame.Rect((col * 68 + 134, row * 65 + 135, TILE_SIZE, TILE_SIZE)))
+                if show_cache:
+                    display.blit(RED_TILE, pygame.Rect((col * 68 + 134, row * 65 + 135, TILE_SIZE, TILE_SIZE)))
                 display.blit(piece_sprite, piece_rect)
     pygame.display.update()
 
