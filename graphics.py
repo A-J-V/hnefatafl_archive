@@ -45,6 +45,8 @@ def refresh(board: np.array,
             display: pygame.surface,
             piece_flags: np.array,
             show_cache: bool = False,
+            dirty_flags: np.array = None,
+            show_dirty: bool = False,
             ):
     display_rect = display.get_rect()
     display.blit(board_image, display_rect)
@@ -56,6 +58,7 @@ def refresh(board: np.array,
                     rc = 135
                     piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
                     display.blit(BLUE_TILE, piece_rect)
+
             else:
                 if board[0, i, j] == 1:
                     plane = 0
@@ -69,6 +72,11 @@ def refresh(board: np.array,
                 piece_rect = pygame.Rect((col * 68 + cc, row * 65 + rc, TILE_SIZE, TILE_SIZE))
                 if show_cache:
                     display.blit(RED_TILE, pygame.Rect((col * 68 + 134, row * 65 + 135, TILE_SIZE, TILE_SIZE)))
+                elif show_dirty and dirty_flags is not None:
+                    if (i, j) in dirty_flags:
+                        display.blit(RED_TILE, pygame.Rect((col * 68 + 134, row * 65 + 135, TILE_SIZE, TILE_SIZE)))
+                    else:
+                        display.blit(BLUE_TILE, pygame.Rect((col * 68 + 134, row * 65 + 135, TILE_SIZE, TILE_SIZE)))
                 display.blit(piece_sprite, piece_rect)
     pygame.display.update()
 

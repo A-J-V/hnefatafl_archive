@@ -6,6 +6,7 @@ import time
 import pandas as pd
 import torch
 from datetime import datetime
+import logging
 
 
 class Node:
@@ -229,11 +230,16 @@ def simulate(board: np.array,
              record: bool = False,
              snapshot: bool = False,
              show_cache: bool = False,
+             show_dirty: bool = False,
              ):
     """Play through a random game on the given board until termination and return the result."""
+    logging.basicConfig(level=logging.DEBUG,
+                        filename='./simulate.log')
+    logging.info(f"""Beginning simulation. visualize: {visualize}.
+     record: {record}. snapshot: {snapshot}. show_cache: {show_cache}""")
     if visualize:
         display = graphics.initialize()
-        graphics.refresh(board, display, piece_flags, show_cache)
+        graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
 
     df = pd.DataFrame(columns=['material_balance',
                                'king_dist',
@@ -266,7 +272,7 @@ def simulate(board: np.array,
     # special_tiles[0, board_size // 2, board_size // 2] = -1  # Center tile
     # special_tiles = special_tiles.to(device).unsqueeze(0)
     while True:
-
+        logging.debug(f"Turn: {turn_num}.")
         if record:
             # At start of turn, append the observation to the dataframe
             obs = extract_features(board,
@@ -343,6 +349,8 @@ def simulate(board: np.array,
 
         # Move evaluation logic goes here.
         action_scores = []
+        # record captures for debugging
+        captures_recorded = []
         for move, row, col in actions:
             # Make a thin move
             new_index, old_index = make_move(board,
@@ -362,21 +370,22 @@ def simulate(board: np.array,
             #    value = 1 - value
 
             # Heuristic Evaluation
-            value = heuristic_evaluation(board=board,
-                                         cache=cache,
-                                         dirty_map=dirty_map,
-                                         dirty_flags=dirty_flags,
-                                         player=player,
-                                         defender_moves=defender_moves,
-                                         attacker_moves=attacker_moves,
-                                         piece_flags=piece_flags,
-                                         new_index=new_index
-                                         )
+            value, captures = heuristic_evaluation(board=board,
+                                                   cache=cache,
+                                                   dirty_map=dirty_map,
+                                                   dirty_flags=dirty_flags,
+                                                   player=player,
+                                                   defender_moves=defender_moves,
+                                                   attacker_moves=attacker_moves,
+                                                   piece_flags=piece_flags,
+                                                   new_index=new_index
+                                                   )
 
             # Revert the temporary move
             revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
 
             action_scores.append(value)
+            captures_recorded.append(captures)
 
         # Epsilon greedy move selection
         if random.random() < 0.10:
@@ -396,6 +405,9 @@ def simulate(board: np.array,
                               dirty_flags=dirty_flags,
                               piece_flags=piece_flags)
 
+        logging.debug(f"""{player} moved ({row}, {col}) to ({new_index[0]}, {new_index[1]}).
+         Recorded {captures_recorded[choice]} captures.""")
+
         # Check for captures around the move
         check_capture(board, new_index, piece_flags=piece_flags)
 
@@ -403,8 +415,8 @@ def simulate(board: np.array,
         player = toggle_player(player)
 
         if visualize:
-            graphics.refresh(board, display, piece_flags, show_cache)
-            time.sleep(0.3)
+            graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
+            time.sleep(0.5)
         turn_num += 1
 
 
@@ -456,4 +468,4 @@ def heuristic_evaluation(board,
     if player == 'attackers':
         value = value * -1
     value -= 1.5 * piece_vulnerable
-    return value
+    return value, captures
