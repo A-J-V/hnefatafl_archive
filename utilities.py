@@ -1106,7 +1106,7 @@ def check_capture(board: np.array,
     row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
 
     # If the throne is empty, it is hostile
-    if not board[:, size // 2, size // 2].any():
+    if not board[2, size // 2, size // 2] == 2:
         hostile.add((size // 2, size // 2))
 
     captures = 0
@@ -1116,7 +1116,9 @@ def check_capture(board: np.array,
         if is_edge(row - 1, col, size):
             tags = []
             if check_shield_wall(board, (row - 1, col), tags, piece_flags):
-                capture_tags(board, tags, piece_flags=piece_flags)
+                captures += len(tags)
+                if not thin_capture:
+                    capture_tags(board, tags, piece_flags=piece_flags)
         # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
         if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile, piece_flags):
             # Destroy it!
@@ -1129,7 +1131,9 @@ def check_capture(board: np.array,
         if is_edge(row + 1, col, size):
             tags = []
             if check_shield_wall(board, (row + 1, col), tags, piece_flags):
-                capture_tags(board, tags, piece_flags=piece_flags)
+                captures += len(tags)
+                if not thin_capture:
+                    capture_tags(board, tags, piece_flags=piece_flags)
         if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile, piece_flags):
             captures += 1
             if not thin_capture:
@@ -1140,7 +1144,9 @@ def check_capture(board: np.array,
         if is_edge(row, col - 1, size):
             tags = []
             if check_shield_wall(board, (row, col - 1), tags, piece_flags):
-                capture_tags(board, tags, piece_flags=piece_flags)
+                captures += len(tags)
+                if not thin_capture:
+                    capture_tags(board, tags, piece_flags=piece_flags)
         if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile, piece_flags):
             captures += 1
             if not thin_capture:
@@ -1151,7 +1157,9 @@ def check_capture(board: np.array,
         if is_edge(row, col + 1, size):
             tags = []
             if check_shield_wall(board, (row, col + 1), tags, piece_flags):
-                capture_tags(board, tags, piece_flags=piece_flags)
+                captures += len(tags)
+                if not thin_capture:
+                    capture_tags(board, tags, piece_flags=piece_flags)
         if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile, piece_flags):
             captures += 1
             if not thin_capture:
