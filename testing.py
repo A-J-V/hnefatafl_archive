@@ -49,14 +49,16 @@ def run_tests():
 
     # A defender is flanked by the empty throne and an attacker. It should be captured upon checking.
     b = TaflBoard(tb['instant_capture_empty_throne_5_7'])
-    check_capture(b.board, (5, 7), piece_flags=b.piece_flags)
+    check_capture(b.board, (5, 7), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 5, 6].any()), \
         "Expected the piece at (5, 6) to be captured, because it was flanked by enemy and empty throne."
 
     # A group of three attackers is pinned in a shield wall on the right edge.
     # They should all be captured upon checking.
     b = TaflBoard(tb['instant_capture_shield_wall_2_10'])
-    check_capture(b.board, (3, 9), piece_flags=b.piece_flags)
+    check_capture(b.board, (3, 9), piece_flags=b.piece_flags, cache=b.cache,
+                  dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 3, 10].any()), \
         "Expected the piece at (3, 10) to be captured, because it was caught in a shield wall."
     assert not (b.board[:, 4, 10].any()), \
@@ -67,7 +69,8 @@ def run_tests():
     # A group of two defenders is pinned in a shield wall on the bottom edge.
     # They should all be captured upon checking.
     b = TaflBoard(tb['instant_capture_shield_wall_9_4'])
-    check_capture(b.board, (9, 4), piece_flags=b.piece_flags)
+    check_capture(b.board, (9, 4), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 10, 4].any()), \
         "Expected the piece at (10, 4) to be captured, because it was caught in a shield wall."
     assert not (b.board[:, 10, 5].any()), \
@@ -76,7 +79,8 @@ def run_tests():
     # A group of two defenders and the King are pinned in a shield wall on the bottom edge.
     # The defenders should be captured upon checking, but not the King.
     b = TaflBoard(tb['instant_capture_shield_wall_9_5'])
-    check_capture(b.board, (9, 5), piece_flags=b.piece_flags)
+    check_capture(b.board, (9, 5), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 10, 4].any()), \
         "Expected the piece at (10, 4) to be captured, because it was caught in a shield wall."
     assert not (b.board[:, 10, 5].any()), \
@@ -87,7 +91,8 @@ def run_tests():
     # A group of four defenders is pinned in a shield wall on the left edge between attackers and a corner.
     # All four defenders should be captured upon checking.
     b = TaflBoard(tb['instant_capture_shield_wall_1_1'])
-    check_capture(b.board, (1, 1), piece_flags=b.piece_flags)
+    check_capture(b.board, (1, 1), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 1, 0].any()), \
         "Expected the piece at (1, 0) to be captured, because it was caught in a shield wall."
     assert not (b.board[:, 2, 0].any()), \
@@ -100,7 +105,8 @@ def run_tests():
     # A group of three defenders is ALMOST pinned in a shield wall on the left edge, but not yet enclosed.
     # All three defenders should NOT be captured upon checking.
     b = TaflBoard(tb['no_capture_shield_wall_2_1'])
-    check_capture(b.board, (2, 1), piece_flags=b.piece_flags)
+    check_capture(b.board, (2, 1), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert (b.board[:, 2, 0].any()), \
         "Expected the piece at (2, 0) to NOT be captured, because the shield wall isn't closed."
     assert (b.board[:, 3, 0].any()), \
@@ -111,7 +117,8 @@ def run_tests():
     # A group of two attackers is pinned in a shield wall on the top edge between defenders.
     # Both attackers should be captured upon checking.
     b = TaflBoard(tb['instant_capture_shield_wall_0_3'])
-    check_capture(b.board, (0, 3), piece_flags=b.piece_flags)
+    check_capture(b.board, (0, 3), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 0, 4].any()), \
         "Expected the piece at (0, 4) to be captured, because it was caught in a shield wall."
     assert not (b.board[:, 0, 5].any()), \
@@ -120,7 +127,8 @@ def run_tests():
         "Expected the piece at (0, 7) to not be captured, because it was outside the shield wall."
 
     b = TaflBoard(tb['instant_capture_1_6'])
-    check_capture(b.board, (1, 6), piece_flags=b.piece_flags)
+    check_capture(b.board, (1, 6), piece_flags=b.piece_flags,
+                  cache=b.cache, dirty_flags=b.dirty_flags, dirty_map=b.dirty_map)
     assert not (b.board[:, 1, 7].any()), \
         "Expected the defender at (1, 7) to be captured, because it was flanked by two attackers."
 

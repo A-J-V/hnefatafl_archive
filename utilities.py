@@ -1091,6 +1091,9 @@ def revert_move(board: np.array,
 def check_capture(board: np.array,
                   index: tuple,
                   piece_flags: np.array,
+                  dirty_map: dict,
+                  dirty_flags: set,
+                  cache: np.array,
                   thin_capture: bool = False,
                   ) -> int:
     """
@@ -1098,6 +1101,9 @@ def check_capture(board: np.array,
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
+    :param dict dirty_map:
+    :param set dirty_flags:
+    :param np.array cache:
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
     :param bool thin_capture: A boolean. If true, captures will be counted, but not actually taken.
     :return: Integer number of pieces captured.
@@ -1126,6 +1132,17 @@ def check_capture(board: np.array,
             if not thin_capture:
                 board[:, row - 1, col] = 0
                 piece_flags[row - 1, col] = 0
+                # TAG NEW DIRTY FLAGS HERE!
+                for affected_index in dirty_map[(row - 1, col)]:
+                    dirty_flags.add(affected_index)
+                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
+                _ = get_moves(board,
+                              (row - 1, col),
+                              cache,
+                              dirty_map,
+                              dirty_flags,
+                              piece_flags
+                              )
 
     if row < size and is_enemy(board, row + 1, col, ally, piece_flags):
         if is_edge(row + 1, col, size):
@@ -1139,6 +1156,17 @@ def check_capture(board: np.array,
             if not thin_capture:
                 board[:, row + 1, col] = 0
                 piece_flags[row + 1, col] = 0
+                # TAG NEW DIRTY FLAGS HERE!
+                for affected_index in dirty_map[(row + 1, col)]:
+                    dirty_flags.add(affected_index)
+                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
+                _ = get_moves(board,
+                              (row + 1, col),
+                              cache,
+                              dirty_map,
+                              dirty_flags,
+                              piece_flags
+                              )
 
     if col > 0 and is_enemy(board, row, col - 1, ally, piece_flags):
         if is_edge(row, col - 1, size):
@@ -1152,6 +1180,17 @@ def check_capture(board: np.array,
             if not thin_capture:
                 board[:, row, col - 1] = 0
                 piece_flags[row, col - 1] = 0
+                # TAG NEW DIRTY FLAGS HERE!
+                for affected_index in dirty_map[(row, col - 1)]:
+                    dirty_flags.add(affected_index)
+                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
+                _ = get_moves(board,
+                              (row, col - 1),
+                              cache,
+                              dirty_map,
+                              dirty_flags,
+                              piece_flags
+                              )
 
     if col < size and is_enemy(board, row, col + 1, ally, piece_flags):
         if is_edge(row, col + 1, size):
@@ -1165,6 +1204,17 @@ def check_capture(board: np.array,
             if not thin_capture:
                 board[:, row, col + 1] = 0
                 piece_flags[row, col + 1] = 0
+                # TAG NEW DIRTY FLAGS HERE!
+                for affected_index in dirty_map[(row, col + 1)]:
+                    dirty_flags.add(affected_index)
+                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
+                _ = get_moves(board,
+                              (row, col + 1),
+                              cache,
+                              dirty_map,
+                              dirty_flags,
+                              piece_flags
+                              )
 
     return captures
 
