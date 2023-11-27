@@ -1124,7 +1124,8 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row - 1, col), tags, piece_flags):
                 captures += len(tags)
                 if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags)
+                    capture_tags(board, tags, piece_flags=piece_flags,
+                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
         # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
         if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile, piece_flags):
             # Destroy it!
@@ -1150,7 +1151,8 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row + 1, col), tags, piece_flags):
                 captures += len(tags)
                 if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags)
+                    capture_tags(board, tags, piece_flags=piece_flags,
+                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
         if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile, piece_flags):
             captures += 1
             if not thin_capture:
@@ -1174,7 +1176,8 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row, col - 1), tags, piece_flags):
                 captures += len(tags)
                 if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags)
+                    capture_tags(board, tags, piece_flags=piece_flags,
+                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
         if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile, piece_flags):
             captures += 1
             if not thin_capture:
@@ -1198,7 +1201,8 @@ def check_capture(board: np.array,
             if check_shield_wall(board, (row, col + 1), tags, piece_flags):
                 captures += len(tags)
                 if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags)
+                    capture_tags(board, tags, piece_flags=piece_flags,
+                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
         if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile, piece_flags):
             captures += 1
             if not thin_capture:
@@ -1222,6 +1226,9 @@ def check_capture(board: np.array,
 def capture_tags(board: np.array,
                  tags: list,
                  piece_flags: np.array,
+                 cache: np.array,
+                 dirty_flags: set,
+                 dirty_map: dict,
                  ) -> None:
     """
     Capture any non-King pieces who are "tagged" as being trapped in a shield wall.
@@ -1229,12 +1236,26 @@ def capture_tags(board: np.array,
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param list tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
+    :param cache:
+    :param dirty_flags:
+    :param dirty_map:
     :return: None; any enemies who are trapped in a shield wall are eliminated by this function.
     """
     for tag in tags:
         if np.argwhere(board[:, tag[0], tag[1]] == 1).item() != 2:
             board[:, tag[0], tag[1]] = 0
             piece_flags[tag[0], tag[1]] = 0
+            # TAG NEW DIRTY FLAGS HERE!
+            for affected_index in dirty_map[tag]:
+                dirty_flags.add(affected_index)
+            # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
+            _ = get_moves(board,
+                          tag,
+                          cache,
+                          dirty_map,
+                          dirty_flags,
+                          piece_flags
+                          )
 
 
 def check_shield_wall(board: np.array,
