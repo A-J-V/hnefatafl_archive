@@ -283,6 +283,14 @@ def run_tests():
                        player="attackers", piece_flags=b.piece_flags)[0] == 'n/a', \
         "Expected no terminal state, but found one."
 
+    b = TaflBoard(tb['encirclement_wall_test_1'])
+    assert not check_encirclement(b.board, b.piece_flags), \
+        "Expected encirclement to be False, but it was True."
+
+    b = TaflBoard(tb['encirclement_wall_test_2'])
+    assert not check_encirclement(b.board, b.piece_flags), \
+        "Expected encirclement to be False, but it was True."
+
     b = TaflBoard(tb['legal_move_check_3_0'])
     legal_moves = get_moves(b.board, (3, 0), cache=b.cache, dirty_map=b.dirty_map,
                             dirty_flags=b.dirty_flags, piece_flags=b.piece_flags)
