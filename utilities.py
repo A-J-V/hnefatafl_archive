@@ -177,7 +177,7 @@ def is_ally(board: np.array, row: int, col: int, ally: int, piece_flags: np.arra
 
 def is_enemy(board: np.array, row: int, col: int, ally: int, piece_flags: np.array) -> bool:
     """
-    Return True if the piece at (row, col) is a non-King enemy according plane.
+    Return True if the piece at (row, col) is a NON-KING enemy according plane.
 
     :param np.array board: The 3D NumPy array "board" on which the game is being played.
     :param int row: The row index.
@@ -796,7 +796,6 @@ def extract_features(board: np.array,
                'king_edge': king_edge
                }
     return payload
-
 # Feature engineering functions end here
 
 
@@ -1121,7 +1120,7 @@ def check_capture(board: np.array,
     if row > 0 and is_enemy(board, row - 1, col, ally, piece_flags):
         if is_edge(row - 1, col, size):
             tags = []
-            if check_shield_wall(board, (row - 1, col), tags, piece_flags):
+            if check_shield_wall(board, (row - 1, col), tags, piece_flags, ally):
                 captures += len(tags)
                 if not thin_capture:
                     capture_tags(board, tags, piece_flags=piece_flags,
@@ -1148,7 +1147,7 @@ def check_capture(board: np.array,
     if row < size and is_enemy(board, row + 1, col, ally, piece_flags):
         if is_edge(row + 1, col, size):
             tags = []
-            if check_shield_wall(board, (row + 1, col), tags, piece_flags):
+            if check_shield_wall(board, (row + 1, col), tags, piece_flags, ally):
                 captures += len(tags)
                 if not thin_capture:
                     capture_tags(board, tags, piece_flags=piece_flags,
@@ -1173,7 +1172,7 @@ def check_capture(board: np.array,
     if col > 0 and is_enemy(board, row, col - 1, ally, piece_flags):
         if is_edge(row, col - 1, size):
             tags = []
-            if check_shield_wall(board, (row, col - 1), tags, piece_flags):
+            if check_shield_wall(board, (row, col - 1), tags, piece_flags, ally):
                 captures += len(tags)
                 if not thin_capture:
                     capture_tags(board, tags, piece_flags=piece_flags,
@@ -1198,7 +1197,7 @@ def check_capture(board: np.array,
     if col < size and is_enemy(board, row, col + 1, ally, piece_flags):
         if is_edge(row, col + 1, size):
             tags = []
-            if check_shield_wall(board, (row, col + 1), tags, piece_flags):
+            if check_shield_wall(board, (row, col + 1), tags, piece_flags, ally):
                 captures += len(tags)
                 if not thin_capture:
                     capture_tags(board, tags, piece_flags=piece_flags,
@@ -1262,63 +1261,44 @@ def check_shield_wall(board: np.array,
                       index: Tuple[int, int],
                       tags: list,
                       piece_flags: np.array,
-                      edge: str = '',
+                      ally: int,
                       ) -> bool:
     """
-    Recursively check whether a shield wall capture can be executed.
+    Check whether a shield wall has been created
 
-    This is an ugly function and should be rewritten from scratch using queue-based flood-fill, not recursion.
-
-    :param np.array board: The 3D NumPy array "board" on which the game is being played.
-    :param Tuple[int, int] index: The index of the piece around which we check for pieces to capture.
-    :param tags: A list of tuples. Each tuple is a piece that was tagged as being trapped in a shield wall.
+    :param np.array board: The 3D NumPy 'board' array on which the game is being played.
+    :param index:
+    :param tags:
     :param np.array piece_flags: A 2D binary NumPy array. If (row, col) is 1, a piece if present, otherwise no piece.
-    :param edge: The board edge against which there may be a shield wall.
-    :return: True if pieces have been trapped in a shield wall, False otherwise.
+    :param ally:
+    :return: True if a shield wall capture has occurred.
     """
-    row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
+    size = board.shape[1] - 1
+    queue = deque()
+    visited = set()
 
-    # A shield wall can only happen if units are "pinned" against an edge.
-    # To check if they're pinned, we need to know the edge along which we're checking.
-    if not edge:
-        if row == 0:
-            edge = 'up'
-        elif row == size:
-            edge = 'down'
-        elif col == 0:
-            edge = 'left'
-        else:
-            edge = 'right'
+    # The initial tile in the queue is the enemy being checked first
+    queue.append(index)
+    tags.append(index)
 
-    h_mapping = {'up': (row + 1, col), 'down': (row - 1, col), 'left': (row, col + 1), 'right': (row, col - 1)}
-    b_mapping = {'up': ((row, col - 1), (row, col + 1)), 'down': ((row, col - 1), (row, col + 1)),
-                 'left': ((row - 1, col), (row + 1, col)), 'right': ((row - 1, col), (row + 1, col))}
-    h_dir = h_mapping[edge]
-    b_dirs = b_mapping[edge]
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
-    if board[0, h_dir[0], h_dir[1]] == 1:
-        plane = 0
-    elif board[1, h_dir[0], h_dir[1]] == 1:
-        plane = 1
-    else:
-        plane = 2
-
-    if (
-       ((is_piece(h_dir[0], h_dir[1], piece_flags) and TEAMS[plane] != ally) or (h_dir[0], h_dir[1]) in hostile) and
-       (is_piece(b_dirs[0][0], b_dirs[0][1], piece_flags) or (b_dirs[0][0], b_dirs[0][1]) in hostile) and
-       (is_piece(b_dirs[1][0], b_dirs[1][1], piece_flags) or (b_dirs[1][0], b_dirs[1][1]) in hostile)
-       ):
-        tags.append(index)
-        adjacent_friends = []
-        if is_ally(board, b_dirs[0][0], b_dirs[0][1], ally, piece_flags) and (b_dirs[0][0], b_dirs[0][1]) not in tags:
-            adjacent_friends.append((b_dirs[0][0], b_dirs[0][1]))
-        if is_ally(board, b_dirs[1][0], b_dirs[1][1], ally, piece_flags) and (b_dirs[1][0], b_dirs[1][1]) not in tags:
-            adjacent_friends.append((b_dirs[1][0], b_dirs[1][1]))
-        for ally in adjacent_friends:
-            if not check_shield_wall(board, ally, tags, piece_flags, edge):
+    while queue:
+        row, col = queue.popleft()
+        visited.add((row, col))
+        if not is_edge(row, col, size):
+            return False
+        for dr, dc in directions:
+            nr, nc = row + dr, col + dc
+            if is_blank(nr, nc, size, piece_flags) and not is_corner(nr, nc, size):
                 return False
-    else:
-        return False
+            elif (in_bounds(nr, nc, size) and
+                  not is_ally(board, nr, nc, ally, piece_flags) and
+                  not is_corner(nr, nc, size) and
+                  (nr, nc) not in visited
+            ):
+                queue.append((nr, nc))
+                tags.append((nr, nc))
     return True
 
 
