@@ -8,6 +8,9 @@ import torch
 from datetime import datetime
 import logging
 
+#device = 'cuda' if torch.cuda.is_available() else 'cpu'
+#model = models.load_baby_viking()
+
 
 class Node:
     node_count = 0
@@ -45,7 +48,12 @@ class Node:
                                   piece_flags=self.piece_flags)
 
             # Check for captures around the move
-            check_capture(self.board, new_index, piece_flags=self.piece_flags)
+            check_capture(self.board,
+                          new_index,
+                          piece_flags=self.piece_flags,
+                          dirty_map=dirty_map,
+                          dirty_flags=dirty_flags,
+                          cache=cache)
 
         # Get the legal actions that can be done in this Node's state
         actions = all_legal_moves(board=self.board,
@@ -232,35 +240,17 @@ def simulate(board: np.array,
              show_cache: bool = False,
              show_dirty: bool = False,
              ):
-    """Play through a random game on the given board until termination and return the result."""
-    logging.basicConfig(level=logging.DEBUG,
-                        filename='./simulate.log')
-    logging.info(f"""Beginning simulation. visualize: {visualize}.
-     record: {record}. snapshot: {snapshot}. show_cache: {show_cache}""")
+    """Play through a game on the given board until termination and return the result."""
+    #SEED = 9
+    #random.seed(SEED)
     if visualize:
         display = graphics.initialize()
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
-
-    df = pd.DataFrame(columns=['material_balance',
-                               'king_dist',
-                               'escorts',
-                               'attack_options',
-                               'close_defenders',
-                               'close_attackers',
-                               'mobility_delta',
-                               'map_control',
-                               'king_escape',
-                               'king_edge',
-                               'player',
-                               'turn_num',
-                               ])
 
     # Add a simple integer cache of how many legal moves each player had last turn.
     attacker_moves = 100
     defender_moves = 100
     turn_num = 1
-    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    # model = models.load_baby_viking()
     #
     # board_size = 11
     # special_tiles = torch.zeros((1, board_size, board_size))
@@ -272,16 +262,6 @@ def simulate(board: np.array,
     # special_tiles[0, board_size // 2, board_size // 2] = -1  # Center tile
     # special_tiles = special_tiles.to(device).unsqueeze(0)
     while True:
-        logging.debug(f"Turn: {turn_num}.")
-        if record:
-            # At start of turn, append the observation to the dataframe
-            obs = extract_features(board,
-                                   defender_moves=defender_moves,
-                                   attacker_moves=attacker_moves,
-                                   piece_flags=piece_flags)
-            obs['player'] = player
-            obs['turn_num'] = turn_num
-            df.loc[len(df)] = obs
 
         if snapshot:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -289,28 +269,18 @@ def simulate(board: np.array,
             tensor_state = torch.Tensor(board)
             torch.save(tensor_state, file_name)
 
-
         # Check for termination
         terminal, reason = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
                                        player=player,
                                        attacker_moves=attacker_moves, defender_moves=defender_moves,
                                        piece_flags=piece_flags)
         if terminal != 'n/a':
-            print(f"{terminal} wins because {reason}.")
-            if record:
-                df['final_turn'] = turn_num
-                df['victory_condition'] = reason
-                df['winner'] = terminal
-
-            return terminal, df
+            #print(f"{terminal} wins because {reason}.")
+            return terminal
         # elif (player == "attackers" and
         #       quiescent_attacker(board=board, piece_flags=piece_flags)):
         #     print("Attackers win (quiescent).")
-        #     if record:
-        #         df['final_turn'] = turn_num
-        #         df['victory_condition'] = 'quiescent_attackers'
-        #         df['winner'] = 'attackers'
-        #     return "attackers", df
+        #     return "attackers"
         # elif (player == "defenders" and
         #       quiescent_defender(board=board,
         #                          cache=cache,
@@ -318,11 +288,7 @@ def simulate(board: np.array,
         #                          dirty_flags=dirty_flags,
         #                          piece_flags=piece_flags)):
         #     print("Defenders win (quiescent).")
-        #     if record:
-        #         df['final_turn'] = turn_num
-        #         df['victory_condition'] = 'quiescent_defenders'
-        #         df['winner'] = 'defenders'
-        #     return "defenders", df
+        #     return "defenders"
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
@@ -333,19 +299,13 @@ def simulate(board: np.array,
         if player == "attackers":
             attacker_moves = len(actions)
             if attacker_moves == 0:
-                print("Attackers have no legal moves!")
-                df['final_turn'] = turn_num
-                df['victory_condition'] = 'attackers_no_moves'
-                df['winner'] = 'defenders'
-                return "defenders", df
+                #print("Attackers have no legal moves!")
+                return "defenders"
         else:
             defender_moves = len(actions)
             if defender_moves == 0:
-                print("Defenders have no legal moves!")
-                df['final_turn'] = turn_num
-                df['victory_condition'] = 'defenders_no_moves'
-                df['winner'] = 'defenders'
-                return "attackers", df
+                #print("Defenders have no legal moves!")
+                return "attackers"
 
         # Move evaluation logic goes here.
         action_scores = []
@@ -394,9 +354,7 @@ def simulate(board: np.array,
             move, row, col = actions[choice]
         else:
             choice = argmax(action_scores)
-            #print(f"This move of {player} is evaluated as {max(action_scores)}.")
             move, row, col = actions[choice]
-
         new_index = make_move(board,
                               (row, col),
                               move,
@@ -405,18 +363,20 @@ def simulate(board: np.array,
                               dirty_flags=dirty_flags,
                               piece_flags=piece_flags)
 
-        logging.debug(f"""{player} moved ({row}, {col}) to ({new_index[0]}, {new_index[1]}).
-         Recorded {captures_recorded[choice]} captures.""")
-
         # Check for captures around the move
-        check_capture(board, new_index, piece_flags=piece_flags)
+        check_capture(board,
+                      new_index,
+                      piece_flags=piece_flags,
+                      dirty_map=dirty_map,
+                      dirty_flags=dirty_flags,
+                      cache=cache)
 
         # Flip the player for the next turn
         player = toggle_player(player)
 
         if visualize:
             graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
-            time.sleep(0.5)
+            time.sleep(1)
         turn_num += 1
 
 
@@ -431,7 +391,13 @@ def heuristic_evaluation(board,
                          new_index,
                          ):
     # Check thin captures
-    captures = check_capture(board, new_index, piece_flags=piece_flags, thin_capture=True)
+    captures = check_capture(board,
+                             new_index,
+                             piece_flags=piece_flags,
+                             thin_capture=True,
+                             dirty_map=dirty_map,
+                             dirty_flags=dirty_flags,
+                             cache=cache)
 
     # Extract features
     features = extract_features(board,
@@ -462,7 +428,7 @@ def heuristic_evaluation(board,
     king_boxed_in = 1 if features['close_defenders'] == 4 else 0
     value = (1.5 * features['material_balance'] - 2 * features['king_dist'] - 1.5 * features['close_attackers']
              - 0.25 * features['attack_options'] + features['escorts'] + 0.2 * features['map_control']
-             - king_boxed_in + 10 * features['king_escape'] + features['king_edge'] +
+             - king_boxed_in + 12 * features['king_escape'] + features['king_edge'] +
              0.5 * features['king_edge'] * features['close_defenders'] + term)
 
     if player == 'attackers':
