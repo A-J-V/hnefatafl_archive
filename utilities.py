@@ -1110,114 +1110,45 @@ def check_capture(board: np.array,
     # Set up some convenient variables
     row, col, teams, size, hostile, plane, ally = get_nice_variables(board, index)
 
+    # Set up directions
+    directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
     # If the throne is empty, it is hostile
     if not board[2, size // 2, size // 2] == 2:
         hostile.add((size // 2, size // 2))
 
     captures = 0
-
-    # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
-    if row > 0 and is_enemy(board, row - 1, col, ally, piece_flags):
-        if is_edge(row - 1, col, size):
-            tags = []
-            if check_shield_wall(board, (row - 1, col), tags, piece_flags, ally):
-                captures += len(tags)
+    # (nr, nc) is a tile adjacent to index. (nr2 and nc2) is the tile adjacent to (nr, nc) opposite index.
+    for dr, dc in directions:
+        nr, nc = row + dr, col + dc
+        nr2, nc2 = nr + dr, nc + dc
+        # All of these if statements could probably be collapsed in a similar way as check_shield_wall()
+        if in_bounds(nr, nc, size) and is_enemy(board, nr, nc, ally, piece_flags):
+            if is_edge(nr, nc, size):
+                tags = []
+                if check_shield_wall(board, (nr, nc), tags, piece_flags, ally):
+                    captures += len(tags)
+                    if not thin_capture:
+                        capture_tags(board, tags, piece_flags=piece_flags,
+                                     cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
+            # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
+            if in_bounds(nr2, nc2, size) and is_flanked(board, nr2, nc2, ally, hostile, piece_flags):
+                # Destroy it!
+                captures += 1
                 if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags,
-                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
-        # if the enemy is not on an edge, and the other side is an allied piece or hostile piece
-        if row - 2 >= 0 and is_flanked(board, row - 2, col, ally, hostile, piece_flags):
-            # Destroy it!
-            captures += 1
-            if not thin_capture:
-                board[:, row - 1, col] = 0
-                piece_flags[row - 1, col] = 0
-                # TAG NEW DIRTY FLAGS HERE!
-                for affected_index in dirty_map[(row - 1, col)]:
-                    dirty_flags.add(affected_index)
-                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
-                _ = get_moves(board,
-                              (row - 1, col),
-                              cache,
-                              dirty_map,
-                              dirty_flags,
-                              piece_flags
-                              )
-
-    if row < size and is_enemy(board, row + 1, col, ally, piece_flags):
-        if is_edge(row + 1, col, size):
-            tags = []
-            if check_shield_wall(board, (row + 1, col), tags, piece_flags, ally):
-                captures += len(tags)
-                if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags,
-                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
-        if row + 2 <= size and is_flanked(board, row + 2, col, ally, hostile, piece_flags):
-            captures += 1
-            if not thin_capture:
-                board[:, row + 1, col] = 0
-                piece_flags[row + 1, col] = 0
-                # TAG NEW DIRTY FLAGS HERE!
-                for affected_index in dirty_map[(row + 1, col)]:
-                    dirty_flags.add(affected_index)
-                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
-                _ = get_moves(board,
-                              (row + 1, col),
-                              cache,
-                              dirty_map,
-                              dirty_flags,
-                              piece_flags
-                              )
-
-    if col > 0 and is_enemy(board, row, col - 1, ally, piece_flags):
-        if is_edge(row, col - 1, size):
-            tags = []
-            if check_shield_wall(board, (row, col - 1), tags, piece_flags, ally):
-                captures += len(tags)
-                if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags,
-                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
-        if col - 2 >= 0 and is_flanked(board, row, col - 2, ally, hostile, piece_flags):
-            captures += 1
-            if not thin_capture:
-                board[:, row, col - 1] = 0
-                piece_flags[row, col - 1] = 0
-                # TAG NEW DIRTY FLAGS HERE!
-                for affected_index in dirty_map[(row, col - 1)]:
-                    dirty_flags.add(affected_index)
-                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
-                _ = get_moves(board,
-                              (row, col - 1),
-                              cache,
-                              dirty_map,
-                              dirty_flags,
-                              piece_flags
-                              )
-
-    if col < size and is_enemy(board, row, col + 1, ally, piece_flags):
-        if is_edge(row, col + 1, size):
-            tags = []
-            if check_shield_wall(board, (row, col + 1), tags, piece_flags, ally):
-                captures += len(tags)
-                if not thin_capture:
-                    capture_tags(board, tags, piece_flags=piece_flags,
-                                 cache=cache, dirty_flags=dirty_flags, dirty_map=dirty_map)
-        if col + 2 <= size and is_flanked(board, row, col + 2, ally, hostile, piece_flags):
-            captures += 1
-            if not thin_capture:
-                board[:, row, col + 1] = 0
-                piece_flags[row, col + 1] = 0
-                # TAG NEW DIRTY FLAGS HERE!
-                for affected_index in dirty_map[(row, col + 1)]:
-                    dirty_flags.add(affected_index)
-                # UPDATE THE CACHE AT THE CAPTURE LOCATION TO REMOVE LEGAL ACTIONS
-                _ = get_moves(board,
-                              (row, col + 1),
-                              cache,
-                              dirty_map,
-                              dirty_flags,
-                              piece_flags
-                              )
+                    board[:, nr, nc] = 0
+                    piece_flags[nr, nc] = 0
+                    # Tag new dirty flags!
+                    for affected_index in dirty_map[(nr, nc)]:
+                        dirty_flags.add(affected_index)
+                    # Update the cache at the capture location to eliminate invalid "legal" moves.
+                    _ = get_moves(board,
+                                  (nr, nc),
+                                  cache,
+                                  dirty_map,
+                                  dirty_flags,
+                                  piece_flags
+                                  )
 
     return captures
 
