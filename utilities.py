@@ -278,6 +278,9 @@ def is_vulnerable(board: np.array,
     if plane == 2:
         return 0
     size = board.shape[2] - 1
+    hostile = [(0, 0), (0, size), (size, 0), (size, size)]
+    if not board[2, size // 2, size // 2] == 2:
+        hostile.append((size // 2, size // 2))
 
     vulnerable_tiles = []
     # For every direction, check for an enemy.
@@ -285,12 +288,12 @@ def is_vulnerable(board: np.array,
         row, col = index
         row += direction[0]
         col += direction[1]
-        if in_bounds(row, col, size) and plane == 1 and is_attacker(board, row, col):
+        if in_bounds(row, col, size) and plane == 1 and (is_attacker(board, row, col) or (row, col) in hostile):
             row -= 2 * direction[0]
             col -= 2 * direction[1]
             if in_bounds(row, col, size) and is_blank_thin(board, row, col, size):
                 vulnerable_tiles.append((row, col))
-        elif in_bounds(row, col, size) and plane == 0 and is_defender(board, row, col):
+        elif in_bounds(row, col, size) and plane == 0 and (is_defender(board, row, col) or (row, col) in hostile):
             row -= 2 * direction[0]
             col -= 2 * direction[1]
             if in_bounds(row, col, size) and is_blank_thin(board, row, col, size):

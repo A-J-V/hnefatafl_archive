@@ -537,12 +537,16 @@ def run_tests():
     assert is_vulnerable(b.board, (4, 4)) == 1, \
         "Expected to be vulnerable, but it was not."
 
-    b = TaflBoard(tb['not_vuln_5_4'])
-    assert is_vulnerable(b.board, (5, 4)) == 0, \
-        "Expected to be not vulnerable, but it was."
+    b = TaflBoard(tb['vuln2_5_4'])
+    assert is_vulnerable(b.board, (5, 4)) == 1, \
+        "Expected to be vulnerable, but it was not."
 
     b = TaflBoard(tb['vuln_5_4'])
     assert is_vulnerable(b.board, (5, 4)) == 1, \
+        "Expected to be vulnerable, but it was not."
+
+    b = TaflBoard(tb['vuln_0_1'])
+    assert is_vulnerable(b.board, (0, 1)) == 1, \
         "Expected to be vulnerable, but it was not."
 
     b = TaflBoard(tb['not_vuln_4_0'])
