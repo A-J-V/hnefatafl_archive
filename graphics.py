@@ -25,7 +25,7 @@ plane_to_img = {0: viking_black,
 
 
 def initialize():
-    # Pygame & Camera setup
+    """Initialize Pygame and set up the camera and related variables."""
     pygame.init()
     main_display = pygame.display.set_mode(size=(WIN_SIZE, WIN_SIZE))
     pygame.display.set_caption('Hnefatafl')
@@ -45,9 +45,22 @@ def refresh(board: np.array,
             display: pygame.surface,
             piece_flags: np.array,
             show_cache: bool = False,
-            dirty_flags: np.array = None,
+            dirty_flags: set = None,
             show_dirty: bool = False,
             ):
+    """
+    Update the camera.
+
+    This function updates the view of the board that the player sees after each move. It can also be used for debugging
+    by highlighting cache info.
+
+    :param board: The 3D NumPy "board" array on which the game is being played.
+    :param display: The Pygame surface on which all graphics are drawn.
+    :param piece_flags: A binary 2D NumPy array where 1 indicates that a piece is present and 0 indicates no piece.
+    :param show_cache: If True, tiles that are occupied by a piece according to the cache will be highlighted.
+    :param dirty_flags: A set of (row, col) tuples indicating which tile needs a cache refresh.
+    :param show_dirty: If true, tiles that are due for a cache refresh are highlighted red, clean caches are blue.
+    """
     display_rect = display.get_rect()
     display.blit(board_image, display_rect)
     for i, row in enumerate(range(board.shape[1])):
