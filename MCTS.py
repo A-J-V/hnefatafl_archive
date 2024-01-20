@@ -8,9 +8,6 @@ import torch
 from datetime import datetime
 import logging
 
-#device = 'cuda' if torch.cuda.is_available() else 'cpu'
-#model = models.load_baby_viking()
-
 
 class Node:
     node_count = 0
@@ -74,7 +71,8 @@ class Node:
                                   dirty_flags=self.dirty_flags,
                                   player=self.player,
                                   piece_flags=self.piece_flags)
-        self.terminal = False if self.winner is None else True
+        #print(self.winner)
+        self.terminal = False if self.winner == ('n/a', 'n/a') else True
 
         # Store whether this Node is fully expanded
         self.is_fully_expanded = False
@@ -141,7 +139,11 @@ class MCTS:
                  dirty_flags: set,
                  player: str,
                  piece_flags: np.array,
-                 max_iter: int = 500):
+                 max_iter: int,
+                 device: str,
+                 model):
+        self.device = device
+        self.model = model
         self.caller = player
         self.root_node = Node(board=board,
                               cache=cache,
@@ -167,34 +169,61 @@ class MCTS:
 
         Node.node_count = 0
         best_child = self.root_node.get_best_child()
+        # Need to implement a selection policy. Currently, the neural version of MCTS
+        # Never explores, it always selects the "best" child according to the MCTS exploration.
         return best_child
 
     def iterate(self):
         """Make a single iteration of MCTS, from selection through backpropagation."""
 
         # 1) Selection
+        #print("Selection...")
         node = self.root_node
         while not node.terminal and node.is_fully_expanded:
             node = node.select_node()
+        #print("Selected.")
 
         # 2) Expansion
+        #print("Expansion...")
+        # Depending on implementation, vanilla MCTS may expand one child at a time or all children depending on
+        # use-case. Currently, we are only expanding one child to save CPU expense. However, we need to consider
+        # if this is most efficient after we switch to AlphaZero style MCTS.
+        # Should we instead expand all children so that we can run batch-inference on all of them in the next step?
+        #print(f"Node terminal: {node.terminal}")
+        #print(f"Node fully expanded: {node.is_fully_expanded}")
         if not node.terminal and not node.is_fully_expanded:
             node = node.expand_child()
+            #print("Expanded.")
 
         # 3) Simulation
-        result = simulate(board=np.array(node.board),
-                          cache=np.array(node.cache),
-                          dirty_map=node.dirty_map.copy(),
-                          dirty_flags=node.dirty_flags.copy(),
-                          player=node.player,
-                          piece_flags=np.array(node.piece_flags))
-        if result == self.caller:
-            result = 1
+        # print("Simulation...")
+        # For vanilla MCTS, simulate is a "random rollout" from this game-state to termination.
+        # In AlphaZero style MCTS, this is replaced with a prediction from the neural network.
+        # We therefore skip the rollout and backpropagate the classification from the neural network.
+        # TODO Make the above adjustment so that we are no longer using complete rollouts.
+        # result = simulate(board=np.array(node.board),
+        #                   cache=np.array(node.cache),
+        #                   dirty_map=node.dirty_map.copy(),
+        #                   dirty_flags=node.dirty_flags.copy(),
+        #                   player=node.player,
+        #                   piece_flags=np.array(node.piece_flags))
+        #
+        # if result is not None:
+        #     print("Simulated.")
+
+        t_board = torch.Tensor(np.array(node.board)).to(self.device).unsqueeze(0)
+        pred = self.model(t_board)
+
+        # Should we backpropagate the thresholded classification or the probability?
+        if self.caller == "defenders":
+            result = pred
         else:
-            result = 0
+            result = 1 - pred
 
         # 4) Backpropagation
+        #print("Backpropagation...")
         node.backpropagate(result)
+        #print("Backpropagated.")
 
 
 def toggle_player(player):
@@ -202,7 +231,7 @@ def toggle_player(player):
     return "defenders" if player == "attackers" else "attackers"
 
 
-def ucb1(node, c: float = 1):
+def ucb1(node, c: float = 1.4):
     """Calculate the UCB1 value using exploration factor c."""
     if isinstance(node, tuple) or node.visits == 0:
         return float('inf')
@@ -241,8 +270,13 @@ def simulate(board: np.array,
              show_dirty: bool = False,
              ):
     """Play through a game on the given board until termination and return the result."""
+    # TODO This function is huge and messy. It needs to be cleaned and probably broken into multiple functions.
+
     #SEED = 9
     #random.seed(SEED)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = models.load_ai()
+
     if visualize:
         display = graphics.initialize()
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
@@ -251,16 +285,7 @@ def simulate(board: np.array,
     attacker_moves = 100
     defender_moves = 100
     turn_num = 1
-    #
-    # board_size = 11
-    # special_tiles = torch.zeros((1, board_size, board_size))
-    # # Mark corners and center (adjust indices based on your board layout)
-    # corner_indices = [0, board_size - 1]
-    # for i in corner_indices:
-    #     for j in corner_indices:
-    #         special_tiles[0, i, j] = 1
-    # special_tiles[0, board_size // 2, board_size // 2] = -1  # Center tile
-    # special_tiles = special_tiles.to(device).unsqueeze(0)
+
     while True:
 
         if snapshot:
@@ -324,7 +349,6 @@ def simulate(board: np.array,
 
             # Neural Net Evaluation
             # t_board = torch.Tensor(board).to(device).unsqueeze(0)
-            # t_board = torch.cat((t_board, special_tiles), dim=1)
             # value = model(t_board)
             # if player == 'attackers':
             #    value = 1 - value
@@ -345,7 +369,7 @@ def simulate(board: np.array,
             revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
 
             action_scores.append(value)
-            captures_recorded.append(captures)
+            #captures_recorded.append(captures)
 
         # Epsilon greedy move selection
         if random.random() < 0.10:
