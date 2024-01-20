@@ -51,12 +51,7 @@ def initialize_game(starting_board: str = starting_board) -> Node:
 class TaflBoard:
     def __init__(self, starting_board: str = starting_board) -> None:
         """
-        Create the game board.
-
-        Takes a string representation of a Tafl board and encodes it into a 3D NumPy array.
-        The board being received must have length == width, and length must be an odd number.
-
-        :param str starting_board:
+        After refactoring, this class is used for testing. The Node class is used in actual gameplay.
         """
         assert len(starting_board.replace('\n',
                                           '')) ** 0.5 % 1 == 0, """The provided starting board
