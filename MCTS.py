@@ -113,14 +113,9 @@ class Node:
 
     def get_best_child(self):
         """Return the 'best' child of this Node according to number of visits."""
-        max_visits = -1
-        best_child = None
-        for child in self.children:
-            if isinstance(child, tuple):
-                continue
-            else:
-                if child.visits > max_visits:
-                    best_child = child
+        visit_counts = [child.visits for child in self.children]
+        max_visit_index = argmax(visit_counts)
+        best_child = self.children[max_visit_index]
         return best_child
 
     def backpropagate(self, result):
@@ -171,6 +166,7 @@ class MCTS:
         best_child = self.root_node.get_best_child()
         # Need to implement a selection policy. Currently, the neural version of MCTS
         # Never explores, it always selects the "best" child according to the MCTS exploration.
+        print([child.visits for child in self.root_node.children])
         return best_child
 
     def iterate(self):
@@ -212,7 +208,8 @@ class MCTS:
         #     print("Simulated.")
 
         t_board = torch.Tensor(np.array(node.board)).to(self.device).unsqueeze(0)
-        pred = self.model(t_board)
+        with torch.inference_mode():
+            pred = self.model(t_board)
 
         # Should we backpropagate the thresholded classification or the probability?
         if self.caller == "defenders":
@@ -231,7 +228,7 @@ def toggle_player(player):
     return "defenders" if player == "attackers" else "attackers"
 
 
-def ucb1(node, c: float = 1.4):
+def ucb1(node, c: float = 1.0):
     """Calculate the UCB1 value using exploration factor c."""
     if isinstance(node, tuple) or node.visits == 0:
         return float('inf')
