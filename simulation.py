@@ -192,30 +192,27 @@ class MCTS:
             #print("Expanded.")
 
         # 3) Simulation
-        # print("Simulation...")
-        # For vanilla MCTS, simulate is a "random rollout" from this game-state to termination.
-        # In AlphaZero style MCTS, this is replaced with a prediction from the neural network.
-        # We therefore skip the rollout and backpropagate the classification from the neural network.
-        # TODO Make the above adjustment so that we are no longer using complete rollouts.
         # result = simulate(board=np.array(node.board),
         #                   cache=np.array(node.cache),
         #                   dirty_map=node.dirty_map.copy(),
         #                   dirty_flags=node.dirty_flags.copy(),
         #                   player=node.player,
         #                   piece_flags=np.array(node.piece_flags))
-        #
-        # if result is not None:
-        #     print("Simulated.")
+        # if result == self.caller:
+        #     result = 1
+        # else:
+        #     result = 0
 
         t_board = torch.Tensor(np.array(node.board)).to(self.device).unsqueeze(0)
         with torch.inference_mode():
             pred = self.model(t_board)
 
         # Should we backpropagate the thresholded classification or the probability?
+        result = pred.item()
         if self.caller == "defenders":
-            result = pred
+            result = result
         else:
-            result = 1 - pred
+            result = 1 - result
 
         # 4) Backpropagation
         #print("Backpropagation...")
@@ -269,11 +266,6 @@ def simulate(board: np.array,
     """Play through a game on the given board until termination and return the result."""
     # TODO This function is huge and messy. It needs to be cleaned and probably broken into multiple functions.
 
-    #SEED = 9
-    #random.seed(SEED)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = models.load_ai()
-
     if visualize:
         display = graphics.initialize()
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
@@ -316,6 +308,8 @@ def simulate(board: np.array,
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
                                   dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
         actions = np.argwhere(actions == 1)
+        print(actions.shape)
+        raise Exception("Stopped here on purpose.")
 
         # Update the integer cache of legal moves for the current player.
         if player == "attackers":
@@ -343,12 +337,6 @@ def simulate(board: np.array,
                                              dirty_flags=dirty_flags,
                                              piece_flags=piece_flags,
                                              thin_move=True)
-
-            # Neural Net Evaluation
-            # t_board = torch.Tensor(board).to(device).unsqueeze(0)
-            # value = model(t_board)
-            # if player == 'attackers':
-            #    value = 1 - value
 
             # Heuristic Evaluation
             value, captures = heuristic_evaluation(board=board,

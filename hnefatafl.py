@@ -2,7 +2,7 @@ from copy import deepcopy
 import numpy as np
 from utilities import *
 from itertools import product
-from MCTS import Node
+from simulation import Node
 
 # Store the initial map in a string
 starting_board = """\

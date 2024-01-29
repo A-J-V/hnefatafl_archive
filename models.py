@@ -1,42 +1,46 @@
 import torch
 from torch import nn
+import math
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+board_size = 11
+period_scale = 2 * math.pi / board_size
+position_tensor = torch.zeros((4, board_size, board_size))
+
+# Encode positions
+for i in range(position_tensor.shape[-1]):
+    for j in range(position_tensor.shape[-2]):
+        position_tensor[0, i, j] = math.sin(i * period_scale)
+        position_tensor[1, i, j] = math.cos(i * period_scale)
+        position_tensor[2, i, j] = math.sin(i * period_scale)
+        position_tensor[3, i, j] = math.cos(i * period_scale)
+position_tensor = position_tensor.unsqueeze(0).expand(1, 4, board_size, board_size).to(device)
 
 
-class ResNet_initial_block(nn.Module):
-    """
-    Accept (batch_size, 3, 224, 224) shaped tensor and pass it through
-    a 7x7 convolution and MaxPool layer.
-    """
-
+class InitialBlock(nn.Module):
     def __init__(self):
         super().__init__()
 
         # The convolution, batchnorm, and ReLU activation.
         # Remember to add the padding!
-        self.resnet_block1 = nn.Sequential(nn.Conv2d(in_channels=3,
-                                                     out_channels=64,
-                                                     kernel_size=(7, 7),
-                                                     stride=1,
-                                                     padding='same'
-                                                     ),
-                                           nn.BatchNorm2d(64),
-                                           nn.ReLU(),
-                                           )
-
-        # The Max Pool layer. Remember to add the padding!
-        # self.pool = nn.MaxPool2d(kernel_size=3,
-        #                         stride=2,
-        #                         padding=1,
-        #                        )
+        self.conv_block = nn.Sequential(nn.Conv2d(in_channels=3,
+                                                  out_channels=64,
+                                                  kernel_size=(3, 3),
+                                                  stride=1,
+                                                  padding='same'
+                                                  ),
+                                        nn.BatchNorm2d(64),
+                                        nn.GELU(),
+                                        )
 
     def forward(self, x):
-        x = self.resnet_block1(x)
-        # x = self.pool(x)
+        x = self.conv_block(x)
         return x
 
 
-class ResNet_basic_block(nn.Module):
-    """Accept tensors and do these operations: conv, relu, conv, add residual, relu."""
+class BasicBlock(nn.Module):
+    """A Convolutional layer that outputs the spatial and channel dims as are input."""
 
     def __init__(self,
                  channels: int):
@@ -47,7 +51,7 @@ class ResNet_basic_block(nn.Module):
                                              padding='same'
                                              ),
                                    nn.BatchNorm2d(channels),
-                                   nn.ReLU()
+                                   nn.GELU()
                                    )
 
         self.conv2 = nn.Sequential(nn.Conv2d(in_channels=channels,
@@ -58,7 +62,7 @@ class ResNet_basic_block(nn.Module):
                                    nn.BatchNorm2d(channels)
                                    )
 
-        self.relu = nn.ReLU()
+        self.relu = nn.GELU()
 
     def forward(self, x):
         res = x
@@ -68,21 +72,22 @@ class ResNet_basic_block(nn.Module):
         return self.relu(x)
 
 
-class ResNet_transition_block(nn.Module):
-    """Accept tensors and do these operations: conv, relu, conv, add residual, relu."""
+class TransitionBlock(nn.Module):
+    """A Conv layer that outputs more channels as are input but same spatial dims."""
 
     def __init__(self,
                  in_channels: int,
-                 out_channels: int):
+                 out_channels: int
+                 ):
         super().__init__()
         self.conv1 = nn.Sequential(nn.Conv2d(in_channels=in_channels,
                                              out_channels=out_channels,
                                              kernel_size=(3, 3),
-                                             stride=2,
-                                             padding=1
+                                             stride=1,
+                                             padding='same'
                                              ),
                                    nn.BatchNorm2d(out_channels),
-                                   nn.ReLU()
+                                   nn.GELU()
                                    )
 
         self.conv2 = nn.Sequential(nn.Conv2d(in_channels=out_channels,
@@ -97,10 +102,10 @@ class ResNet_transition_block(nn.Module):
         self.residual = nn.Conv2d(in_channels=in_channels,
                                   out_channels=out_channels,
                                   kernel_size=(1, 1),
-                                  stride=2
+                                  stride=1,
                                   )
 
-        self.relu = nn.ReLU()
+        self.relu = nn.GELU()
 
     def forward(self, x):
         res = self.residual(x)
@@ -110,40 +115,58 @@ class ResNet_transition_block(nn.Module):
         return self.relu(x)
 
 
-class ResNet(nn.Module):
-    """Model architecture based on the the paper 'Deep Residual Learning for Image Recognition'
-       by He, Zhang, Ren, and Sun (2015).
-
-       This is the 34-layer version.
-       """
-
-    def __init__(self, classes=1) -> None:
+class AttentionBlock(nn.Module):
+    def __init__(self, n_dims, n_heads):
         super().__init__()
-
-        self.resnet = nn.Sequential(*[
-            ResNet_initial_block(),
-            nn.Sequential(*(ResNet_basic_block(64) for _ in range(3))),
-            ResNet_transition_block(64, 128),
-            nn.Sequential(*(ResNet_basic_block(128) for _ in range(3))),
-            ResNet_transition_block(128, 256),
-            nn.Sequential(*(ResNet_basic_block(256) for _ in range(4))),
-            ResNet_transition_block(256, 512),
-            nn.Sequential(*(ResNet_basic_block(512) for _ in range(2))),
-            # nn.AvgPool2d(kernel_size=(7, 7)),
-            nn.Flatten(),
-            nn.Linear(in_features=2048, out_features=classes),
-            nn.Sigmoid(),
-        ])
+        self.attention = nn.MultiheadAttention(n_dims, n_heads)
 
     def forward(self, x):
-        return self.resnet(x)
+        x = torch.cat((position_tensor, x), dim=1)
+        # Flatten the input from (batch_size, features, height, width)
+        # to (batch_size, features, height*width) and permute it to
+        # (height*width, batch_size, features) then send it through attention
+        x = x.view(x.shape[0], x.shape[1], x.shape[2] ** 2)
+        x = x.permute(2, 0, 1)
+        x, _ = self.attention(x, x, x)
+        return x
 
 
-def load_baby_viking():
+class NeuralViking2(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.conv_section = nn.Sequential(*[
+            InitialBlock(),
+            nn.Sequential(*(BasicBlock(64) for _ in range(3))),
+            TransitionBlock(64, 128),
+            nn.Sequential(*(BasicBlock(128) for _ in range(3))),
+            TransitionBlock(128, 256),
+            nn.Sequential(*(BasicBlock(256) for _ in range(3))),
+            TransitionBlock(256, 512),
+            nn.Sequential(*(BasicBlock(512) for _ in range(2))),
+        ])
+
+        self.attention_section = AttentionBlock(n_dims=516,
+                                                n_heads=6,
+                                                )
+        self.classifier = nn.Sequential(
+            nn.Linear(516, 516),
+            nn.GELU(),
+            nn.Linear(516, 1),
+            nn.Sigmoid())
+
+    def forward(self, x):
+        x = self.conv_section(x)
+        x = self.attention_section(x)
+        x = self.classifier(x[0])
+        return x
+
+
+def load_ai():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using torch version {torch.__version__}.")
     print(f"Using {device}.")
 
-    model = torch.load('./ai_models/BabyViking.pth',
+    model = torch.load('./ai_models/NeuralViking2.pth',
                        map_location=torch.device(device))
     return model

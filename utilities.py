@@ -802,6 +802,23 @@ def extract_features(board: np.array,
 # Feature engineering functions end here
 
 
+def collapse_board(board: np.ndarray) -> np.ndarray:
+    collapsed_board = np.argmax(board, axis=0)
+    empty_mask = np.sum(board, axis=0) == 0
+    collapsed_board[empty_mask] = -1
+    flat_board = collapsed_board.flatten()
+    return flat_board
+
+
+def reconstruct_board(flat_board: np.ndarray) -> np.ndarray:
+    reshaped = flat_board.reshape(11, 11)
+    reconstructed = np.zeros((3, 11, 11))
+    rows, cols = np.indices((11, 11))
+    valid_indices = reshaped != -1
+    reconstructed[reshaped[valid_indices], rows[valid_indices], cols[valid_indices]] = 1
+    return reconstructed
+
+
 def get_moves(board: np.array,
               index: Tuple[int, int],
               cache: np.array,
@@ -973,6 +990,7 @@ def all_legal_moves(board: np.array,
         mask = np.sum(board[1:, :, :], axis=0) != 1
     action_space = np.array(cache)
     action_space[:, mask] = 0
+
     return action_space
 
 
