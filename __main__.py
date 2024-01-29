@@ -22,10 +22,9 @@ from test_boards import test_boards as tb
 if __name__ == "__main__":
     # start_time = time.time()
     b = hnefatafl.initialize_game()
-    flat = collapse_board(b.board)
-    reconstructed = reconstruct_board(flat)
-    print((b.board == reconstructed).all())
-    raise Exception()
+    # flat = collapse_board(b.board)
+    # print(flat)
+    # raise Exception()
     # player = "attackers"
     # display = graphics.initialize()
     # graphics.refresh(b.board, display, piece_flags=b.piece_flags)
@@ -77,9 +76,10 @@ if __name__ == "__main__":
             b.dirty_flags,
             'attackers',
             b.piece_flags,
-            visualize=True,
+            record=True,
+            visualize=False,
             show_cache=False,
-            show_dirty=True)
+            show_dirty=False)
     #print(b.dirty_flags)
     #cProfile.run("simulate(b.board, b.cache, b.dirty_map, b.dirty_flags, 'attackers', piece_flags=b.piece_flags, visualize=False)")
     # times = []

@@ -286,13 +286,15 @@ def simulate(board: np.array,
                                        piece_flags=piece_flags)
         if terminal != 'n/a':
             #print(f"{terminal} wins because {reason}.")
-            game_state_df = pd.DataFrame(game_states)
-            game_moves_df = pd.DataFrame(game_moves)
-            game_moves_df.columns = ['move', 'row', 'col']
-            game_df = pd.concat([game_state_df, game_moves_df], axis=1)
-            game_df['winner'] = terminal
-            game_df.reset_index()
-            print(game_df.head())
+            if record:
+                game_state_df = pd.DataFrame(game_states)
+                game_moves_df = pd.DataFrame(game_moves)
+                game_moves_df.columns = ['move', 'row', 'col']
+                game_df = pd.concat([game_state_df, game_moves_df], axis=1)
+                game_df['winner'] = 0 if terminal == "attackers" else 1
+                game_df.reset_index()
+                timestamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")
+                game_df.to_csv("./game_recordings/record_" + timestamp + ".csv", index=False)
             return terminal
         # elif (player == "attackers" and
         #       quiescent_attacker(board=board, piece_flags=piece_flags)):
