@@ -2,6 +2,7 @@ from collections import deque
 import random
 # import cython
 import numpy as np
+import pandas as pd
 # cimport numpy as np
 from typing import List, Tuple
 
@@ -800,6 +801,8 @@ def extract_features(board: np.array,
                }
     return payload
 # Feature engineering functions end here
+# These are some functions added after the decision to scrap MCTS and AlphaZero for now
+# They focus on more efficient data manipulation to ease training.
 
 
 def collapse_board(board: np.ndarray) -> np.ndarray:

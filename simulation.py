@@ -259,12 +259,14 @@ def simulate(board: np.array,
              piece_flags: np.array,
              visualize: bool = False,
              record: bool = False,
-             snapshot: bool = False,
              show_cache: bool = False,
              show_dirty: bool = False,
              ):
     """Play through a game on the given board until termination and return the result."""
     # TODO This function is huge and messy. It needs to be cleaned and probably broken into multiple functions.
+    if record:
+        game_states = []
+        game_moves = []
 
     if visualize:
         display = graphics.initialize()
@@ -277,12 +279,6 @@ def simulate(board: np.array,
 
     while True:
 
-        if snapshot:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            file_name = f"./pending/snapshot_{timestamp}.pt"
-            tensor_state = torch.Tensor(board)
-            torch.save(tensor_state, file_name)
-
         # Check for termination
         terminal, reason = is_terminal(board=board, cache=cache, dirty_map=dirty_map, dirty_flags=dirty_flags,
                                        player=player,
@@ -290,6 +286,13 @@ def simulate(board: np.array,
                                        piece_flags=piece_flags)
         if terminal != 'n/a':
             #print(f"{terminal} wins because {reason}.")
+            game_state_df = pd.DataFrame(game_states)
+            game_moves_df = pd.DataFrame(game_moves)
+            game_moves_df.columns = ['move', 'row', 'col']
+            game_df = pd.concat([game_state_df, game_moves_df], axis=1)
+            game_df['winner'] = terminal
+            game_df.reset_index()
+            print(game_df.head())
             return terminal
         # elif (player == "attackers" and
         #       quiescent_attacker(board=board, piece_flags=piece_flags)):
@@ -308,8 +311,6 @@ def simulate(board: np.array,
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
                                   dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
         actions = np.argwhere(actions == 1)
-        print(actions.shape)
-        raise Exception("Stopped here on purpose.")
 
         # Update the integer cache of legal moves for the current player.
         if player == "attackers":
@@ -364,6 +365,12 @@ def simulate(board: np.array,
         else:
             choice = argmax(action_scores)
             move, row, col = actions[choice]
+
+        if record:
+            flat_board = collapse_board(board)
+            game_states.append(flat_board)
+            game_moves.append(np.array([move, row, col]))
+
         new_index = make_move(board,
                               (row, col),
                               move,
