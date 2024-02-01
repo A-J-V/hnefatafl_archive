@@ -1,6 +1,6 @@
 from copy import deepcopy
 import numpy as np
-from utilities import *
+from utils import *
 from itertools import product
 from simulation import Node
 

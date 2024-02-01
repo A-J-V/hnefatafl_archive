@@ -4,8 +4,8 @@ import pygame
 import time
 import torch
 import models
-from utilities import *
-from models import InitialBlock, BasicBlock, TransitionBlock, AttentionBlock, NeuralViking2
+from utils import *
+from models import FeatureExtractionBlock, AttentionBlock, PolicyHead, ValueHead, PPOViking
 from simulation import simulate
 import cProfile
 import random
@@ -21,7 +21,7 @@ from test_boards import test_boards as tb
 
 if __name__ == "__main__":
     # start_time = time.time()
-    b = hnefatafl.initialize_game()
+    #b = hnefatafl.initialize_game()
     # flat = collapse_board(b.board)
     # print(flat)
     # raise Exception()
@@ -69,17 +69,24 @@ if __name__ == "__main__":
     #          max_iter=100)
     # cProfile.run("mcts.run()")
     # mcts_result = mcts.run()
-
-    simulate(b.board,
-            b.cache,
-            b.dirty_map,
-            b.dirty_flags,
-            'attackers',
-            b.piece_flags,
-            record=True,
-            visualize=False,
-            show_cache=False,
-            show_dirty=False)
+    times = []
+    for _ in range(100):
+        b = hnefatafl.initialize_game()
+        start = time.time()
+        simulate(b.board,
+                 b.cache,
+                 b.dirty_map,
+                 b.dirty_flags,
+                 'attackers',
+                 b.piece_flags,
+                 record=False,
+                 visualize=False,
+                 show_cache=False,
+                 show_dirty=False,
+                 neural=True)
+        times.append(time.time() - start)
+    print(times)
+    print(f"Average time per game: {sum(times) / len(times)}")
     #print(b.dirty_flags)
     #cProfile.run("simulate(b.board, b.cache, b.dirty_map, b.dirty_flags, 'attackers', piece_flags=b.piece_flags, visualize=False)")
     # times = []

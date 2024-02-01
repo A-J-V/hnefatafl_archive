@@ -2,35 +2,28 @@ import torch
 from torch import nn
 import math
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-board_size = 11
-period_scale = 2 * math.pi / board_size
-position_tensor = torch.zeros((4, board_size, board_size))
-
-# Encode positions
-for i in range(position_tensor.shape[-1]):
-    for j in range(position_tensor.shape[-2]):
-        position_tensor[0, i, j] = math.sin(i * period_scale)
-        position_tensor[1, i, j] = math.cos(i * period_scale)
-        position_tensor[2, i, j] = math.sin(i * period_scale)
-        position_tensor[3, i, j] = math.cos(i * period_scale)
-position_tensor = position_tensor.unsqueeze(0).expand(1, 4, board_size, board_size).to(device)
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class InitialBlock(nn.Module):
-    def __init__(self):
+class FeatureExtractionBlock(nn.Module):
+    def __init__(self, embedding_dim):
         super().__init__()
 
-        # The convolution, batchnorm, and ReLU activation.
-        # Remember to add the padding!
         self.conv_block = nn.Sequential(nn.Conv2d(in_channels=3,
-                                                  out_channels=64,
+                                                  out_channels=embedding_dim,
                                                   kernel_size=(3, 3),
                                                   stride=1,
                                                   padding='same'
                                                   ),
-                                        nn.BatchNorm2d(64),
+                                        nn.BatchNorm2d(embedding_dim),
+                                        nn.GELU(),
+                                        nn.Conv2d(in_channels=embedding_dim,
+                                                  out_channels=embedding_dim,
+                                                  kernel_size=(3, 3),
+                                                  stride=1,
+                                                  padding='same'
+                                                  ),
+                                        nn.BatchNorm2d(embedding_dim),
                                         nn.GELU(),
                                         )
 
@@ -39,127 +32,104 @@ class InitialBlock(nn.Module):
         return x
 
 
-class BasicBlock(nn.Module):
-    """A Convolutional layer that outputs the spatial and channel dims as are input."""
-
-    def __init__(self,
-                 channels: int):
-        super().__init__()
-        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=channels,
-                                             out_channels=channels,
-                                             kernel_size=(3, 3),
-                                             padding='same'
-                                             ),
-                                   nn.BatchNorm2d(channels),
-                                   nn.GELU()
-                                   )
-
-        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=channels,
-                                             out_channels=channels,
-                                             kernel_size=(3, 3),
-                                             padding='same'
-                                             ),
-                                   nn.BatchNorm2d(channels)
-                                   )
-
-        self.relu = nn.GELU()
-
-    def forward(self, x):
-        res = x
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x += res
-        return self.relu(x)
-
-
-class TransitionBlock(nn.Module):
-    """A Conv layer that outputs more channels as are input but same spatial dims."""
-
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int
-                 ):
-        super().__init__()
-        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=in_channels,
-                                             out_channels=out_channels,
-                                             kernel_size=(3, 3),
-                                             stride=1,
-                                             padding='same'
-                                             ),
-                                   nn.BatchNorm2d(out_channels),
-                                   nn.GELU()
-                                   )
-
-        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=out_channels,
-                                             out_channels=out_channels,
-                                             kernel_size=(3, 3),
-                                             padding='same'
-                                             ),
-                                   nn.BatchNorm2d(out_channels)
-                                   )
-
-        #
-        self.residual = nn.Conv2d(in_channels=in_channels,
-                                  out_channels=out_channels,
-                                  kernel_size=(1, 1),
-                                  stride=1,
-                                  )
-
-        self.relu = nn.GELU()
-
-    def forward(self, x):
-        res = self.residual(x)
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x += res
-        return self.relu(x)
-
-
 class AttentionBlock(nn.Module):
     def __init__(self, n_dims, n_heads):
         super().__init__()
-        self.attention = nn.MultiheadAttention(n_dims, n_heads)
+        self.attention = nn.MultiheadAttention(n_dims, n_heads, batch_first=True)
+        self.norm1 = nn.LayerNorm(n_dims)
+        self.mlp = nn.Sequential(
+            nn.Linear(n_dims, n_dims * 2),
+            nn.GELU(),
+            nn.Linear(n_dims * 2, n_dims),
+        )
+        self.norm2 = nn.LayerNorm(n_dims)
 
     def forward(self, x):
-        x = torch.cat((position_tensor, x), dim=1)
-        # Flatten the input from (batch_size, features, height, width)
-        # to (batch_size, features, height*width) and permute it to
-        # (height*width, batch_size, features) then send it through attention
-        x = x.view(x.shape[0], x.shape[1], x.shape[2] ** 2)
-        x = x.permute(2, 0, 1)
-        x, _ = self.attention(x, x, x)
+        attn_out, _ = self.attention(x, x, x)
+        x = self.norm1(attn_out + x)
+        mlp_out = self.mlp(x)
+        x = self.norm2(mlp_out + x)
         return x
 
 
-class NeuralViking2(nn.Module):
-    def __init__(self) -> None:
+class PolicyHead(nn.Module):
+    def __init__(self, n_dims):
         super().__init__()
 
-        self.conv_section = nn.Sequential(*[
-            InitialBlock(),
-            nn.Sequential(*(BasicBlock(64) for _ in range(3))),
-            TransitionBlock(64, 128),
-            nn.Sequential(*(BasicBlock(128) for _ in range(3))),
-            TransitionBlock(128, 256),
-            nn.Sequential(*(BasicBlock(256) for _ in range(3))),
-            TransitionBlock(256, 512),
-            nn.Sequential(*(BasicBlock(512) for _ in range(2))),
-        ])
-
-        self.attention_section = AttentionBlock(n_dims=516,
-                                                n_heads=6,
-                                                )
-        self.classifier = nn.Sequential(
-            nn.Linear(516, 516),
+        self.policy = nn.Sequential(
+            nn.Linear(n_dims * 121, 512),
             nn.GELU(),
-            nn.Linear(516, 1),
-            nn.Sigmoid())
+            nn.Linear(512, 40 * 11 * 11),
+        )
 
     def forward(self, x):
-        x = self.conv_section(x)
-        x = self.attention_section(x)
-        x = self.classifier(x[0])
+        x = x.view(x.size(0), -1)
+        x = self.policy(x)
+        x = x.view(-1, 40, 11, 11)
         return x
+
+
+class ValueHead(nn.Module):
+    def __init__(self, n_dims):
+        super().__init__()
+
+        self.value = nn.Sequential(
+            nn.Linear(n_dims * 121, 100),
+            nn.GELU(),
+            nn.Linear(100, 1),
+        )
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        x = self.value(x).squeeze()
+        return x
+
+
+class PPOViking(nn.Module):
+    def __init__(self, n_dims, n_heads) -> None:
+        super().__init__()
+
+        self.feature_extraction = FeatureExtractionBlock(n_dims - 5)
+
+        board_size = 11
+        period_scale = 2 * math.pi / board_size
+        position_tensor = torch.zeros((4, board_size, board_size))
+
+        # Encode positions
+        for i in range(position_tensor.shape[-1]):
+            for j in range(position_tensor.shape[-2]):
+                position_tensor[0, i, j] = math.sin(i * period_scale)
+                position_tensor[1, i, j] = math.cos(i * period_scale)
+                position_tensor[2, i, j] = math.sin(j * period_scale)
+                position_tensor[3, i, j] = math.cos(j * period_scale)
+
+        self.position_tensor = position_tensor.unsqueeze(0)
+
+        self.attention = nn.Sequential(
+            AttentionBlock(n_dims, n_heads),
+            AttentionBlock(n_dims, n_heads),
+            AttentionBlock(n_dims, n_heads),
+        )
+        self.policy_head = PolicyHead(n_dims)
+        self.value_head = ValueHead(n_dims)
+
+    def forward(self, x, player_tensor):
+        x = self.feature_extraction(x)
+
+        batch_position = self.position_tensor.to(x.device.type).expand(x.shape[0], 4, 11, 11)
+        x = torch.cat((batch_position, x), dim=1)
+        x = torch.cat((player_tensor, x), dim=1)
+
+        # Reshape the tensor from [batch, features, h, w] to [batch, h*w, features]
+        x = x.view(x.shape[0], x.shape[1], x.shape[2] ** 2)
+        x = x.permute(0, 2, 1)
+
+        x = self.attention(x)
+
+        policy_out = self.policy_head(x)
+        value_out = self.value_head(x)
+
+        return policy_out, value_out
 
 
 def load_ai():
@@ -167,6 +137,6 @@ def load_ai():
     print(f"Using torch version {torch.__version__}.")
     print(f"Using {device}.")
 
-    model = torch.load('./ai_models/NeuralViking2.pth',
+    model = torch.load('./ai_models/PPOViking_Mk1.pth',
                        map_location=torch.device(device))
     return model
