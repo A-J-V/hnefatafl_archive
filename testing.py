@@ -1,6 +1,6 @@
 from test_boards import test_boards as tb
 from hnefatafl import TaflBoard
-from utils import *
+from game_logic import *
 
 
 def run_tests():

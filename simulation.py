@@ -1,5 +1,5 @@
 import models
-from utils import *
+from game_logic import *
 import random
 import graphics
 import time
@@ -261,7 +261,6 @@ def simulate(board: np.array,
              record: bool = False,
              show_cache: bool = False,
              show_dirty: bool = False,
-             neural: bool = False,
              ):
     """Play through a game on the given board until termination and return the result."""
     # TODO This function is huge and messy. It needs to be cleaned and probably broken into multiple functions.
@@ -273,10 +272,9 @@ def simulate(board: np.array,
         display = graphics.initialize()
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
 
-    if neural:
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        model = models.load_ai()
-        model.eval()
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = models.load_ai()
+    model.eval()
 
     # Add a simple integer cache of how many legal moves each player had last turn.
     attacker_moves = 100
@@ -318,27 +316,15 @@ def simulate(board: np.array,
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
                                   dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
-        if neural:
-            torch.set_printoptions(threshold=10_000)
-            if player == "attackers":
-                player_tensor = torch.ones(1, 11, 11).float().unsqueeze(0).to(device)
-            else:
-                player_tensor = torch.zeros(1, 11, 11).float().unsqueeze(0).to(device)
-            board_tensor = torch.from_numpy(board).float().unsqueeze(0).to(device)
-            with torch.inference_mode():
-                policy_pred, value_pred = model(board_tensor, player_tensor)
-            policy_pred = policy_pred.squeeze(0)
-            policy_pred = torch.nn.functional.softmax(policy_pred.view(-1))
 
-            policy_pred = torch.where(torch.from_numpy(actions).view(-1).to(device) == 1,
-                                      policy_pred,
-                                      torch.zeros_like(policy_pred))
+        policy_pred, value_pred = get_network_probs(board=board,
+                                                    player=player,
+                                                    model=model,
+                                                    actions=actions)
 
-            policy_pred = policy_pred / torch.sum(policy_pred)
-
-            # Action selection
-            action_selection = torch.multinomial(policy_pred, 1)
-            move, row, col = np.unravel_index(action_selection.item(), (40, 11, 11))
+        # Action selection
+        action_selection = torch.multinomial(policy_pred, 1)
+        move, row, col = np.unravel_index(action_selection.item(), (40, 11, 11))
 
         actions = np.argwhere(actions == 1)
 
@@ -353,49 +339,6 @@ def simulate(board: np.array,
             if defender_moves == 0:
                 #print("Defenders have no legal moves!")
                 return "attackers"
-
-        # Move evaluation logic goes here.
-        action_scores = []
-        # record captures for debugging
-        captures_recorded = []
-        if not neural:
-            for move, row, col in actions:
-                # Make a thin move
-                new_index, old_index = make_move(board,
-                                                 (row, col),
-                                                 move,
-                                                 cache=cache,
-                                                 dirty_map=dirty_map,
-                                                 dirty_flags=dirty_flags,
-                                                 piece_flags=piece_flags,
-                                                 thin_move=True)
-
-                # Heuristic Evaluation
-                value, captures = heuristic_evaluation(board=board,
-                                                       cache=cache,
-                                                       dirty_map=dirty_map,
-                                                       dirty_flags=dirty_flags,
-                                                       player=player,
-                                                       defender_moves=defender_moves,
-                                                       attacker_moves=attacker_moves,
-                                                       piece_flags=piece_flags,
-                                                       new_index=new_index
-                                                       )
-
-                # Revert the temporary move
-                revert_move(board, new_index=new_index, old_index=old_index, piece_flags=piece_flags)
-
-                action_scores.append(value)
-                #captures_recorded.append(captures)
-
-            # Epsilon greedy move selection
-            if random.random() < 0.10:
-                # Randomly select a legal move and make that move.
-                choice = random.randint(0, len(actions) - 1)
-                move, row, col = actions[choice]
-            else:
-                choice = argmax(action_scores)
-                move, row, col = actions[choice]
 
         if record:
             flat_board = collapse_board(board)
@@ -425,6 +368,31 @@ def simulate(board: np.array,
             graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
             time.sleep(1)
         turn_num += 1
+
+
+def get_network_probs(board, player, model, actions, device='cuda'):
+    board_tensor = torch.from_numpy(board).float().unsqueeze(0).to(device)
+
+    if player == "attackers":
+        player_tensor = torch.ones(1, 11, 11).float().unsqueeze(0).to(device)
+    else:
+        player_tensor = torch.zeros(1, 11, 11).float().unsqueeze(0).to(device)
+
+    with torch.inference_mode():
+        policy_pred, value_pred = model(board_tensor, player_tensor)
+
+    policy_pred = policy_pred.squeeze(0)
+    policy_pred = torch.nn.functional.softmax(policy_pred.view(-1))
+
+    policy_pred = torch.where(torch.from_numpy(actions).view(-1).to(device) == 1,
+                              policy_pred,
+                              torch.zeros_like(policy_pred))
+
+    policy_pred = policy_pred / torch.sum(policy_pred)
+    value_pred = torch.sigmoid(value_pred)
+
+    return policy_pred, value_pred
+
 
 
 def heuristic_evaluation(board,

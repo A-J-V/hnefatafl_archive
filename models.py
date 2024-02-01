@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 import math
 
 #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -89,22 +90,20 @@ class PPOViking(nn.Module):
     def __init__(self, n_dims, n_heads) -> None:
         super().__init__()
 
-        self.feature_extraction = FeatureExtractionBlock(n_dims - 5)
-
+        # Encode cell positions
         board_size = 11
         period_scale = 2 * math.pi / board_size
-        position_tensor = torch.zeros((4, board_size, board_size))
+        position_tensor = torch.zeros((2, board_size, board_size))
 
-        # Encode positions
         for i in range(position_tensor.shape[-1]):
             for j in range(position_tensor.shape[-2]):
-                position_tensor[0, i, j] = math.sin(i * period_scale)
-                position_tensor[1, i, j] = math.cos(i * period_scale)
-                position_tensor[2, i, j] = math.sin(j * period_scale)
-                position_tensor[3, i, j] = math.cos(j * period_scale)
-
+                position_tensor[0, i, j] = i
+                position_tensor[1, i, j] = j
+        position_tensor = position_tensor / 10
         self.position_tensor = position_tensor.unsqueeze(0)
 
+        # Define layers
+        self.feature_extraction = FeatureExtractionBlock(n_dims - 3)
         self.attention = nn.Sequential(
             AttentionBlock(n_dims, n_heads),
             AttentionBlock(n_dims, n_heads),
@@ -113,10 +112,11 @@ class PPOViking(nn.Module):
         self.policy_head = PolicyHead(n_dims)
         self.value_head = ValueHead(n_dims)
 
+    # Include player into x so that forward doesn't require two args?
     def forward(self, x, player_tensor):
         x = self.feature_extraction(x)
 
-        batch_position = self.position_tensor.to(x.device.type).expand(x.shape[0], 4, 11, 11)
+        batch_position = self.position_tensor.to(x.device.type).expand(x.shape[0], 2, 11, 11)
         x = torch.cat((batch_position, x), dim=1)
         x = torch.cat((player_tensor, x), dim=1)
 
@@ -137,6 +137,6 @@ def load_ai():
     print(f"Using torch version {torch.__version__}.")
     print(f"Using {device}.")
 
-    model = torch.load('./ai_models/PPOViking_Mk1.pth',
+    model = torch.load('./ai_models/PPOViking_v0_2.pth',
                        map_location=torch.device(device))
     return model
