@@ -1,3 +1,5 @@
+import numpy as np
+
 import models
 from game_logic import *
 import random
@@ -263,10 +265,12 @@ def simulate(board: np.array,
              show_dirty: bool = False,
              ):
     """Play through a game on the given board until termination and return the result."""
-    # TODO This function is huge and messy. It needs to be cleaned and probably broken into multiple functions.
+
     if record:
         game_states = []
         game_moves = []
+        game_action_space = []
+        turn = []
 
     if visualize:
         display = graphics.initialize()
@@ -293,25 +297,17 @@ def simulate(board: np.array,
             if record:
                 game_state_df = pd.DataFrame(game_states)
                 game_moves_df = pd.DataFrame(game_moves)
+                game_action_space_df = pd.DataFrame(game_action_space)
+                game_state_df.columns = ['c' + str(i) for i in list(game_state_df.columns)]
                 game_moves_df.columns = ['move', 'row', 'col']
-                game_df = pd.concat([game_state_df, game_moves_df], axis=1)
+                game_action_space_df.columns = ['a' + str(i) for i in list(game_action_space_df.columns)]
+                game_df = pd.concat([game_state_df, game_moves_df, game_action_space_df], axis=1)
                 game_df['winner'] = 0 if terminal == "attackers" else 1
+                game_df['turn'] = turn
                 game_df.reset_index()
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")
                 game_df.to_csv("./game_recordings/record_" + timestamp + ".csv", index=False)
             return terminal
-        # elif (player == "attackers" and
-        #       quiescent_attacker(board=board, piece_flags=piece_flags)):
-        #     print("Attackers win (quiescent).")
-        #     return "attackers"
-        # elif (player == "defenders" and
-        #       quiescent_defender(board=board,
-        #                          cache=cache,
-        #                          dirty_map=dirty_map,
-        #                          dirty_flags=dirty_flags,
-        #                          piece_flags=piece_flags)):
-        #     print("Defenders win (quiescent).")
-        #     return "defenders"
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
@@ -320,30 +316,31 @@ def simulate(board: np.array,
         policy_pred, value_pred = get_network_probs(board=board,
                                                     player=player,
                                                     model=model,
-                                                    actions=actions)
+                                                    actions=actions,
+                                                    device=device)
 
-        # Action selection
+        # Stochastic action selection
         action_selection = torch.multinomial(policy_pred, 1)
         move, row, col = np.unravel_index(action_selection.item(), (40, 11, 11))
 
-        actions = np.argwhere(actions == 1)
+        if record:
+            flat_board = collapse_board(board)
+            flat_actions = collapse_action_space(actions.astype('int'))
+            game_states.append(flat_board)
+            game_moves.append(np.array([move, row, col]))
+            game_action_space.append(flat_actions)
+            turn.append(1 if player == "attackers" else 0)
 
+        actions = np.argwhere(actions == 1)
         # Update the integer cache of legal moves for the current player.
         if player == "attackers":
             attacker_moves = len(actions)
             if attacker_moves == 0:
-                #print("Attackers have no legal moves!")
                 return "defenders"
         else:
             defender_moves = len(actions)
             if defender_moves == 0:
-                #print("Defenders have no legal moves!")
                 return "attackers"
-
-        if record:
-            flat_board = collapse_board(board)
-            game_states.append(flat_board)
-            game_moves.append(np.array([move, row, col]))
 
         new_index = make_move(board,
                               (row, col),
@@ -392,7 +389,6 @@ def get_network_probs(board, player, model, actions, device='cuda'):
     value_pred = torch.sigmoid(value_pred)
 
     return policy_pred, value_pred
-
 
 
 def heuristic_evaluation(board,

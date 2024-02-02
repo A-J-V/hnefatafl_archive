@@ -822,6 +822,16 @@ def reconstruct_board(flat_board: np.ndarray) -> np.ndarray:
     return reconstructed
 
 
+def collapse_action_space(actions: np.ndarray) -> np.ndarray:
+    flat_actions = actions.flatten()
+    return flat_actions
+
+
+def reconstruct_action_space(flat_actions: np.ndarray) -> np.ndarray:
+    reconstructed_actions = flat_actions.reshape((40, 11, 11))
+    return reconstructed_actions
+
+
 def get_moves(board: np.array,
               index: Tuple[int, int],
               cache: np.array,
