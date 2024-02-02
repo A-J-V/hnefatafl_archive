@@ -131,6 +131,26 @@ class PPOViking(nn.Module):
 
         return policy_out, value_out
 
+    def pred_probs(self, x, player_tensor, mask):
+        """
+        Automatically handles softmax, masking illegal moves, and renormalizing.
+        Returns the correct probability distribution over the legal action space.
+        """
+        if len(x.shape) == 3:
+            x = x.unsqueeze(0)
+
+        policy_out, value_out = self.forward(x, player_tensor)
+
+        batch_size, _, _, _ = policy_out.shape
+        policy_out = policy_out.view(batch_size, -1)
+        policy_out = F.softmax(policy_out, dim=1)
+        policy_out = torch.where(mask == 1, policy_out, torch.zeros_like(policy_out))
+        policy_out /= torch.sum(policy_out, dim=1, keepdim=True)
+
+        value_out = torch.sigmoid(value_out)
+
+        return policy_out, value_out
+
 
 def load_ai():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

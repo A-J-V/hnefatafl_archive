@@ -299,10 +299,10 @@ def simulate(board: np.array,
                 game_moves_df = pd.DataFrame(game_moves)
                 game_action_space_df = pd.DataFrame(game_action_space)
                 game_state_df.columns = ['c' + str(i) for i in list(game_state_df.columns)]
-                game_moves_df.columns = ['move', 'row', 'col']
+                game_moves_df.columns = ['a_index', 'a_prob']
                 game_action_space_df.columns = ['a' + str(i) for i in list(game_action_space_df.columns)]
                 game_df = pd.concat([game_state_df, game_moves_df, game_action_space_df], axis=1)
-                game_df['winner'] = 0 if terminal == "attackers" else 1
+                game_df['winner'] = 1 if terminal == "attackers" else 0
                 game_df['turn'] = turn
                 game_df.reset_index()
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")
@@ -313,21 +313,22 @@ def simulate(board: np.array,
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
                                   dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
 
-        policy_pred, value_pred = get_network_probs(board=board,
-                                                    player=player,
-                                                    model=model,
-                                                    actions=actions,
-                                                    device=device)
+        policy_pred, value_pred = model.pred_probs(torch.from_numpy(board).float().unsqueeze(0).to(device),
+                                                   player_tensor=get_player_tensor(player).to(device),
+                                                   mask=torch.from_numpy(actions).view(-1).to(device))
+
+        #assert torch.allclose(policy_pred, policy_prob), "The policy probability from different sources are not equal"
 
         # Stochastic action selection
         action_selection = torch.multinomial(policy_pred, 1)
+        action_prob = policy_pred[0, action_selection.item()]
         move, row, col = np.unravel_index(action_selection.item(), (40, 11, 11))
 
         if record:
             flat_board = collapse_board(board)
             flat_actions = collapse_action_space(actions.astype('int'))
             game_states.append(flat_board)
-            game_moves.append(np.array([move, row, col]))
+            game_moves.append(np.array([action_selection.item(), action_prob.item()]))
             game_action_space.append(flat_actions)
             turn.append(1 if player == "attackers" else 0)
 
@@ -367,28 +368,33 @@ def simulate(board: np.array,
         turn_num += 1
 
 
-def get_network_probs(board, player, model, actions, device='cuda'):
-    board_tensor = torch.from_numpy(board).float().unsqueeze(0).to(device)
-
+def get_player_tensor(player):
     if player == "attackers":
-        player_tensor = torch.ones(1, 11, 11).float().unsqueeze(0).to(device)
+        player_tensor = torch.ones(1, 11, 11).float().unsqueeze(0)
     else:
-        player_tensor = torch.zeros(1, 11, 11).float().unsqueeze(0).to(device)
+        player_tensor = torch.zeros(1, 11, 11).float().unsqueeze(0)
+    return player_tensor
 
-    with torch.inference_mode():
-        policy_pred, value_pred = model(board_tensor, player_tensor)
 
-    policy_pred = policy_pred.squeeze(0)
-    policy_pred = torch.nn.functional.softmax(policy_pred.view(-1))
-
-    policy_pred = torch.where(torch.from_numpy(actions).view(-1).to(device) == 1,
-                              policy_pred,
-                              torch.zeros_like(policy_pred))
-
-    policy_pred = policy_pred / torch.sum(policy_pred)
-    value_pred = torch.sigmoid(value_pred)
-
-    return policy_pred, value_pred
+# def get_network_probs(board, player, model, actions, device='cuda'):
+#
+#     board_tensor = torch.from_numpy(board).float().unsqueeze(0).to(device)
+#     player_tensor = get_player_tensor(player).to(device)
+#
+#     with torch.inference_mode():
+#         policy_pred, value_pred = model(board_tensor, player_tensor)
+#
+#     policy_pred = policy_pred.squeeze(0)
+#     policy_pred = torch.nn.functional.softmax(policy_pred.view(-1))
+#
+#     policy_pred = torch.where(torch.from_numpy(actions).view(-1).to(device) == 1,
+#                               policy_pred,
+#                               torch.zeros_like(policy_pred))
+#
+#     policy_pred = policy_pred / torch.sum(policy_pred)
+#     value_pred = torch.sigmoid(value_pred)
+#
+#     return policy_pred, value_pred
 
 
 def heuristic_evaluation(board,
