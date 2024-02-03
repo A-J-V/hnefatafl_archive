@@ -152,11 +152,11 @@ class PPOViking(nn.Module):
         return policy_out, value_out
 
 
-def load_ai():
+def load_ai(model):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using torch version {torch.__version__}.")
     print(f"Using {device}.")
 
-    model = torch.load('./ai_models/PPOViking_v0_2.pth',
+    model = torch.load(f'./ai_models/{model}.pth',
                        map_location=torch.device(device))
     return model
