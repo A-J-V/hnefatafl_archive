@@ -272,6 +272,7 @@ def simulate(board: np.array,
         game_moves = []
         game_action_space = []
         turn = []
+        value_estimates = []
 
         # Used only for logging
         entropies = []
@@ -281,7 +282,7 @@ def simulate(board: np.array,
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = models.load_ai(model="PPO_initial")
+    model = models.load_ai(model="PPOViking_current")
     model.eval()
 
     # Add a simple integer cache of how many legal moves each player had last turn.
@@ -309,6 +310,18 @@ def simulate(board: np.array,
                 winner = 1 if terminal == "attackers" else 0
                 game_df['winner'] = winner
                 game_df['turn'] = turn
+                game_df['v_est'] = value_estimates
+                game_df['v_est_next'] = game_df['v_est'].shift(-1, fill_value=0)
+                game_df['td_error_attacker'] = get_td_error(game_df['v_est'],
+                                                            game_df['v_est_next'],
+                                                            1,
+                                                            winner)
+                game_df['td_error_defender'] = get_td_error(game_df['v_est'],
+                                                            game_df['v_est_next'],
+                                                            0,
+                                                            winner)
+                game_df['gae_attacker'] = calculate_gae(game_df['td_error_attacker'], lambda_=0.96)
+                game_df['gae_defender'] = calculate_gae(game_df['td_error_defender'], lambda_=0.96)
                 game_df.reset_index()
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")
                 game_df.to_csv("./game_recordings/record_" + timestamp + ".csv", index=False)
@@ -340,6 +353,7 @@ def simulate(board: np.array,
             game_moves.append(np.array([action_selection.item(), action_prob.item()]))
             game_action_space.append(flat_actions)
             turn.append(1 if player == "attackers" else 0)
+            value_estimates.append(value_pred.item())
             entropies.append(entropy)
 
         actions = np.argwhere(actions == 1)
@@ -386,25 +400,33 @@ def get_player_tensor(player):
     return player_tensor
 
 
-# def get_network_probs(board, player, model, actions, device='cuda'):
-#
-#     board_tensor = torch.from_numpy(board).float().unsqueeze(0).to(device)
-#     player_tensor = get_player_tensor(player).to(device)
-#
-#     with torch.inference_mode():
-#         policy_pred, value_pred = model(board_tensor, player_tensor)
-#
-#     policy_pred = policy_pred.squeeze(0)
-#     policy_pred = torch.nn.functional.softmax(policy_pred.view(-1))
-#
-#     policy_pred = torch.where(torch.from_numpy(actions).view(-1).to(device) == 1,
-#                               policy_pred,
-#                               torch.zeros_like(policy_pred))
-#
-#     policy_pred = policy_pred / torch.sum(policy_pred)
-#     value_pred = torch.sigmoid(value_pred)
-#
-#     return policy_pred, value_pred
+def get_td_error(vt, vtp, player, winner):
+    """Given the value estimates for t and t+1, player, and winner, calculate TD error for the player."""
+    # Value estimate is actually the probability of the defender winning, so we need to recode it.
+    rewards = np.zeros_like(vt.values)
+    if winner == player:
+        rewards[-1] = 1
+    else:
+        rewards[-1] = 0
+    if player == 1:
+        value_est = 1 - vt
+        value_est_next = 1 - vtp
+    value_est = vt * 2 - 1
+    value_est_next = vtp * 2 - 1
+
+    td_error = value_est_next - value_est + rewards
+    return td_error
+
+
+def calculate_gae(td_error, gamma=0.99, lambda_=0.95):
+    # Calculate GAE
+    gae = []
+    gae_t = 0
+    for t in reversed(range(len(td_error))):
+        delta = td_error.iloc[t]
+        gae_t = delta + gamma * lambda_ * gae_t
+        gae.insert(0, gae_t)
+    return gae
 
 
 def heuristic_evaluation(board,
