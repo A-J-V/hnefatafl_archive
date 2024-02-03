@@ -267,17 +267,21 @@ def simulate(board: np.array,
     """Play through a game on the given board until termination and return the result."""
 
     if record:
+        # Needed for training
         game_states = []
         game_moves = []
         game_action_space = []
         turn = []
+
+        # Used only for logging
+        entropies = []
 
     if visualize:
         display = graphics.initialize()
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = models.load_ai()
+    model = models.load_ai(model="PPO_initial")
     model.eval()
 
     # Add a simple integer cache of how many legal moves each player had last turn.
@@ -302,22 +306,27 @@ def simulate(board: np.array,
                 game_moves_df.columns = ['a_index', 'a_prob']
                 game_action_space_df.columns = ['a' + str(i) for i in list(game_action_space_df.columns)]
                 game_df = pd.concat([game_state_df, game_moves_df, game_action_space_df], axis=1)
-                game_df['winner'] = 1 if terminal == "attackers" else 0
+                winner = 1 if terminal == "attackers" else 0
+                game_df['winner'] = winner
                 game_df['turn'] = turn
                 game_df.reset_index()
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")
                 game_df.to_csv("./game_recordings/record_" + timestamp + ".csv", index=False)
+
+                # Gather the metrics we want to log
+                metrics = [winner, turn_num, (sum(entropies) / len(entropies))]
+                return metrics
             return terminal
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
                                   dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
 
-        policy_pred, value_pred = model.pred_probs(torch.from_numpy(board).float().unsqueeze(0).to(device),
-                                                   player_tensor=get_player_tensor(player).to(device),
-                                                   mask=torch.from_numpy(actions).view(-1).to(device))
-
-        #assert torch.allclose(policy_pred, policy_prob), "The policy probability from different sources are not equal"
+        with torch.inference_mode():
+            policy_pred, value_pred = model.pred_probs(torch.from_numpy(board).float().unsqueeze(0).to(device),
+                                                       player_tensor=get_player_tensor(player).to(device),
+                                                       mask=torch.from_numpy(actions).view(-1).to(device))
+        entropy = -(policy_pred * (policy_pred + 0.0000001).log()).sum(-1).item()
 
         # Stochastic action selection
         action_selection = torch.multinomial(policy_pred, 1)
@@ -331,6 +340,7 @@ def simulate(board: np.array,
             game_moves.append(np.array([action_selection.item(), action_prob.item()]))
             game_action_space.append(flat_actions)
             turn.append(1 if player == "attackers" else 0)
+            entropies.append(entropy)
 
         actions = np.argwhere(actions == 1)
         # Update the integer cache of legal moves for the current player.
