@@ -2,6 +2,7 @@ import numpy as np
 
 import models
 from game_logic import *
+from node import Node
 import random
 import graphics
 import time
@@ -9,123 +10,6 @@ import pandas as pd
 import torch
 from datetime import datetime
 import logging
-
-
-class Node:
-    node_count = 0
-
-    def __init__(self,
-                 board: np.array,
-                 cache: np.array,
-                 dirty_map: dict,
-                 dirty_flags: set,
-                 player: str,
-                 piece_flags: np.array,
-                 parent=None,
-                 spawning_action=None
-                 ) -> None:
-        self.board = np.array(board)
-        self.cache = np.array(cache)
-        self.dirty_map = dirty_map.copy()
-        self.dirty_flags = dirty_flags.copy()
-        self.player = player
-        self.piece_flags = np.array(piece_flags)
-        self.parent = parent
-        self.spawning_action = spawning_action
-        self.children = []
-        self.visits = 0
-        self.value = 0
-
-        if spawning_action:
-            # Update the new node's state by carrying out the action that creates it
-            new_index = make_move(board=self.board,
-                                  index=(spawning_action[1], spawning_action[2]),
-                                  move=spawning_action[0],
-                                  cache=self.cache,
-                                  dirty_map=self.dirty_map,
-                                  dirty_flags=self.dirty_flags,
-                                  piece_flags=self.piece_flags)
-
-            # Check for captures around the move
-            check_capture(self.board,
-                          new_index,
-                          piece_flags=self.piece_flags,
-                          dirty_map=dirty_map,
-                          dirty_flags=dirty_flags,
-                          cache=cache)
-
-        # Get the legal actions that can be done in this Node's state
-        actions = all_legal_moves(board=self.board,
-                                  cache=self.cache,
-                                  dirty_map=self.dirty_map,
-                                  dirty_flags=self.dirty_flags,
-                                  player=self.player,
-                                  piece_flags=self.piece_flags
-                                  )
-        actions = np.argwhere(actions == 1)
-        # This isn't guaranteed to be a random order
-        self.actions = {(move, row, col) for move, row, col in actions}
-
-        # Check whether this Node is terminal
-        self.winner = is_terminal(board=self.board,
-                                  cache=self.cache,
-                                  dirty_map=self.dirty_map,
-                                  dirty_flags=self.dirty_flags,
-                                  player=self.player,
-                                  piece_flags=self.piece_flags)
-        #print(self.winner)
-        self.terminal = False if self.winner == ('n/a', 'n/a') else True
-
-        # Store whether this Node is fully expanded
-        self.is_fully_expanded = False
-
-    def select_node(self):
-        """Use the UCB1 formula to select a node"""
-        best_value = -float('inf')
-        best_child = None
-        for child in self.children:
-            value = ucb1(child)
-            if value > best_value:
-                best_value = value
-                best_child = child
-        return best_child
-
-    def expand_child(self):
-        """Take an action from the Node's list of actions, and instantiate a new Node with that action."""
-
-        # Pop one of this Node's actions. Create a new Node, and pass in that action as the spawning action.
-        action = self.actions.pop()
-        new_node = Node(board=self.board,
-                        cache=self.cache,
-                        dirty_map=self.dirty_map,
-                        dirty_flags=self.dirty_flags,
-                        player=toggle_player(self.player),
-                        piece_flags=self.piece_flags,
-                        parent=self,
-                        spawning_action=action)
-        Node.node_count += 1
-
-        # Append the new Node to the list of this Node's children.
-        self.children.append(new_node)
-
-        # If that was the last unexplored action of this Node, set this Node as fully expanded.
-        if not self.actions:
-            self.is_fully_expanded = True
-        return new_node
-
-    def get_best_child(self):
-        """Return the 'best' child of this Node according to number of visits."""
-        visit_counts = [child.visits for child in self.children]
-        max_visit_index = argmax(visit_counts)
-        best_child = self.children[max_visit_index]
-        return best_child
-
-    def backpropagate(self, result):
-        """Backpropagate the result of exploration up the game tree."""
-        self.visits += 1
-        self.value += result
-        if self.parent:
-            self.parent.backpropagate(1 if result == 0 else 0)
 
 
 class MCTS:
@@ -206,15 +90,20 @@ class MCTS:
         #     result = 0
 
         t_board = torch.Tensor(np.array(node.board)).to(self.device).unsqueeze(0)
+        player_tensor = get_player_tensor(self.caller)
+        actions = all_legal_moves(board=node.board, cache=node.cache, dirty_map=node.dirty_map,
+                                  dirty_flags=node.dirty_flags, player=node.player, piece_flags=node.piece_flags)
+        flat_actions = collapse_action_space(actions.astype('int'))
+        mask_tensor = torch.tensor(flat_actions)
+
+        if self.caller == "attackers":
+            player_tensor += 1
+
         with torch.inference_mode():
-            pred = self.model(t_board)
+            _, value_pred = self.model(t_board, player_tensor, mask_tensor)
 
         # Should we backpropagate the thresholded classification or the probability?
-        result = pred.item()
-        if self.caller == "defenders":
-            result = result
-        else:
-            result = 1 - result
+        result = value_pred.item()
 
         # 4) Backpropagation
         #print("Backpropagation...")
@@ -274,16 +163,16 @@ def simulate(board: np.array,
         turn = []
         value_estimates = []
 
-        # Used only for logging
-        entropies = []
-
     if visualize:
         display = graphics.initialize()
         graphics.refresh(board, display, piece_flags, show_cache, dirty_flags=dirty_flags, show_dirty=show_dirty)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = models.load_ai(model="PPOViking_current")
-    model.eval()
+    model_a = models.load_ai(model="NV_attacker")
+    model_b = models.load_ai(model="NV_defender")
+
+    model_a.eval()
+    model_b.eval()
 
     # Add a simple integer cache of how many legal moves each player had last turn.
     attacker_moves = 100
@@ -298,6 +187,9 @@ def simulate(board: np.array,
                                        attacker_moves=attacker_moves, defender_moves=defender_moves,
                                        piece_flags=piece_flags)
         if terminal != 'n/a':
+            # If there turn is 1, then this was an aborted curriculum learning attempt.
+            if turn_num == 1:
+                return -1
             print(f"{terminal} wins because {reason}.")
             if record:
                 game_state_df = pd.DataFrame(game_states)
@@ -320,30 +212,46 @@ def simulate(board: np.array,
                                                             game_df['v_est_next'],
                                                             0,
                                                             winner)
-                game_df['gae_attacker'] = calculate_gae(game_df['td_error_attacker'], lambda_=0.96)
-                game_df['gae_defender'] = calculate_gae(game_df['td_error_defender'], lambda_=0.96)
+                game_df['gae_attacker'] = calculate_gae(game_df['td_error_attacker'], lambda_=0.99)
+                game_df['gae_defender'] = calculate_gae(game_df['td_error_defender'], lambda_=0.99)
                 game_df.reset_index()
                 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S_%f")
                 game_df.to_csv("./game_recordings/record_" + timestamp + ".csv", index=False)
 
-                # Gather the metrics we want to log
-                metrics = [winner, turn_num, (sum(entropies) / len(entropies))]
-                return metrics
+                return winner
             return terminal
 
         # Get a masked action space of legal moves for the player, then get a list of those moves.
         actions = all_legal_moves(board=board, cache=cache, dirty_map=dirty_map,
                                   dirty_flags=dirty_flags, player=player, piece_flags=piece_flags)
 
+        if player == "attackers":
+            model = model_a
+        elif player == "defenders":
+            model = model_b
+        else:
+            raise Exception("Unrecognized player.")
+
         with torch.inference_mode():
             policy_pred, value_pred = model.pred_probs(torch.from_numpy(board).float().unsqueeze(0).to(device),
                                                        player_tensor=get_player_tensor(player).to(device),
                                                        mask=torch.from_numpy(actions).view(-1).to(device))
-        entropy = -(policy_pred * (policy_pred + 0.0000001).log()).sum(-1).item()
 
         # Stochastic action selection
-        action_selection = torch.multinomial(policy_pred, 1)
-        action_prob = policy_pred[0, action_selection.item()]
+        try:
+            action_selection = torch.multinomial(policy_pred, 1)
+            action_prob = policy_pred[0, action_selection.item()]
+        except:
+            print("Encountered error at torch.multinomial... This needs to be fixed!")
+            print(f"The policy preds contains nan: {torch.isnan(policy_pred).any()}")
+            print(f"The policy preds contains inf: {torch.isinf(policy_pred).any()}")
+            print(f"The policy preds contains < 0: {(policy_pred < 0).any()}")
+            pred_clone = policy_pred.clone()
+            pred_clone = torch.where((torch.isnan(pred_clone)) | (pred_clone == 0), 0, 0.1)
+            pred_clone /= torch.sum(pred_clone, dim=1, keepdim=True)
+            action_selection = torch.multinomial(pred_clone, 1)
+            action_prob = pred_clone[0, action_selection.item()]
+
         move, row, col = np.unravel_index(action_selection.item(), (40, 11, 11))
 
         if record:
@@ -354,7 +262,6 @@ def simulate(board: np.array,
             game_action_space.append(flat_actions)
             turn.append(1 if player == "attackers" else 0)
             value_estimates.append(value_pred.item())
-            entropies.append(entropy)
 
         actions = np.argwhere(actions == 1)
         # Update the integer cache of legal moves for the current player.
@@ -402,19 +309,13 @@ def get_player_tensor(player):
 
 def get_td_error(vt, vtp, player, winner):
     """Given the value estimates for t and t+1, player, and winner, calculate TD error for the player."""
-    # Value estimate is actually the probability of the defender winning, so we need to recode it.
     rewards = np.zeros_like(vt.values)
     if winner == player:
         rewards[-1] = 1
     else:
-        rewards[-1] = 0
-    if player == 1:
-        value_est = 1 - vt
-        value_est_next = 1 - vtp
-    value_est = vt * 2 - 1
-    value_est_next = vtp * 2 - 1
+        rewards[-1] = -1
 
-    td_error = value_est_next - value_est + rewards
+    td_error = vtp - vt + rewards
     return td_error
 
 

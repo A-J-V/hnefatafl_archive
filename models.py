@@ -92,7 +92,6 @@ class PPOViking(nn.Module):
 
         # Encode cell positions
         board_size = 11
-        period_scale = 2 * math.pi / board_size
         position_tensor = torch.zeros((2, board_size, board_size))
 
         for i in range(position_tensor.shape[-1]):
@@ -105,8 +104,6 @@ class PPOViking(nn.Module):
         # Define layers
         self.feature_extraction = FeatureExtractionBlock(n_dims - 3)
         self.attention = nn.Sequential(
-            AttentionBlock(n_dims, n_heads),
-            AttentionBlock(n_dims, n_heads),
             AttentionBlock(n_dims, n_heads),
         )
         self.policy_head = PolicyHead(n_dims)
@@ -140,15 +137,34 @@ class PPOViking(nn.Module):
             x = x.unsqueeze(0)
 
         policy_out, value_out = self.forward(x, player_tensor)
+        if torch.isnan(policy_out).any():
+            print("Policy out had nan values immediately after forward()")
 
         batch_size, _, _, _ = policy_out.shape
         policy_out = policy_out.view(batch_size, -1)
+        policy_out = policy_out - policy_out.max(dim=1, keepdim=True)[0]
         policy_out = F.softmax(policy_out, dim=1)
+        if torch.isnan(policy_out).any():
+            print("Policy out had nan values immediately after softmax()")
         policy_out = torch.where(mask == 1, policy_out, torch.zeros_like(policy_out))
-        policy_out /= torch.sum(policy_out, dim=1, keepdim=True)
+        prob_sum = torch.sum(policy_out, dim=1, keepdim=True)
 
-        value_out = torch.sigmoid(value_out)
+        zero_sum_mask = prob_sum <= 1e-9
+        if len(mask.shape) == 1:
+            mask = mask.unsqueeze(0)
 
+        num_legal_moves = mask.sum(1, keepdim=True)
+        no_legal_moves = num_legal_moves == 0
+        uniform_policy_out = torch.full_like(policy_out, 0.5)
+        policy_out = torch.where(mask == 1, policy_out, torch.zeros_like(policy_out))
+        policy_out = torch.where(no_legal_moves, uniform_policy_out, policy_out)
+
+        prob_sum = torch.sum(policy_out, dim=1, keepdim=True)
+        policy_out = policy_out / prob_sum
+
+        value_out = torch.tanh(value_out)
+        if torch.isnan(policy_out).any():
+            print("Policy out had nan values before return")
         return policy_out, value_out
 
 
