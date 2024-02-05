@@ -4,7 +4,7 @@
 
 Despite learning a lot from this project, it ultimately failed in its objective of training a Hnefatafl agent via RL. Here is a laundry list of what went wrong.
 
-I original envisioned this as using AlphaZero-style training. However, I have no real experience in RL, so picking one of the most complicated RL algorithms as a first attempt was very foolish, and several problems ensued both from my lack of understanding policy-gradient methods as well as design missteps.
+I original envisioned this as using AlphaZero-style training. However, I had no real experience in RL when I started it, so picking one of the most complicated RL algorithms as a first attempt was very foolish, and several problems ensued both from my lack of understanding policy-gradient methods as well as design missteps.
 
 First, I decided to imitate the tensor shape of AlphaZero's inputs and outputs in the game environment so that the game board is represented as a 3x11x11 ndarray and the action space as a 40x11x11 ndarray. This choice was, in retrospect, nonsensical. I should have opted for a highly readable data structure to hold the game state, and then applied a transformation when it was time to convert it to tensors for training. Although this seems obvious now, I didn't catch it in time and had baked the hideous ndarray data structures into the game environment when I realized that it was a bad decision.
 
